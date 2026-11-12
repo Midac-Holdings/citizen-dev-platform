@@ -1,0 +1,29 @@
+name: 部内テストの申告
+
+# PR 本文の「部内テスト（必須）」欄を確認する。本文を編集すると再確認される。
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dept-test:
+    name: 部内テストの申告
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # 判定に使うのは main 側の仕組み（PR 側で書き換えられないように）
+          ref: ${{ github.event.pull_request.base.sha }}
+      - name: 部内テスト欄の記入を確認
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_DRAFT: ${{ github.event.pull_request.draft }}
+        run: |
+          # この仕組みを追加する PR 自体では、main にまだ確認用のプログラムがないためスキップ
+          if [ ! -f tools/check-dept-test.mjs ]; then echo "確認用のプログラムが main にないためスキップ"; exit 0; fi
+          node tools/check-dept-test.mjs
