@@ -1,0 +1,10 @@
+{
+  "name": "（アプリ名）",
+  "description": "（このアプリでできることを1〜2文で）",
+  "category": "申請・手続き",
+  "icon": "🧩",
+  "color": "#3a86ff",
+  "owner": "（部署名）",
+  "status": "available",
+  "access": ["authenticated"]
+}
