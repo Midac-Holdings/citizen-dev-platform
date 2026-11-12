@@ -4,7 +4,7 @@
 **GitHub でプルリクエスト → 自動チェック → AI担当が承認 → 自動で公開**する流れを試すリポジトリです。
 
 ```
-市民：Claude Code でアプリを作る ─▶ PR を出す
+市民：Claude Code でアプリを作る ─▶ 下書き（Draft）PR を出す
                                     │
                                     ▼
                      自動チェック（下の「自動チェック」の①〜⑦）
@@ -12,6 +12,9 @@
                                     ▼
                      プレビュー環境に公開（PR にURLがコメントされる・ログイン必須）
                                     │
+市民と部内の人：プレビューで部内テスト ─▶ PR に「部内テスト」欄を記入 → Ready for review
+                                    │（記入がないと自動チェックが失敗し、先に進めない）
+                                    ▼
 AI担当：内容とプレビューを確認 ─▶ Approve（承認）→ Merge
                                     │
                                     ▼
@@ -102,7 +105,7 @@ npm run build                        # dist/ に1つのサイトとしてまと�
    - ✅ Require a pull request before merging
      - ✅ Require approvals（1）
      - ✅ Require review from Code Owners
-   - ✅ Require status checks to pass → 「チェックと公開」を選ぶ
+   - ✅ Require status checks to pass → 「チェックと公開」と「部内テストの申告」を選ぶ
    - ✅ Do not allow bypassing the above settings
 3. 市民役の GitHub アカウントを「Settings → Collaborators」で招待する
    （自分の PR は自分で承認できないため、市民役と AI担当役は別アカウントが必要）
@@ -126,6 +129,11 @@ PR のたびに次を実行し、1つでも失敗すると承認・マージで�
 | ⑤ | 禁止パターン | 外部URL・通信処理・`eval`・HTMLの直接書き込み・Cookie・ログイン処理・環境変数を検出 |
 | ⑥ | ブラウザでの送信制限（CSP） | サイト全体に「自社サイト以外からの読み込み・自社サイト以外への送信は禁止」のヘッダーを付ける。⑤をすり抜けても、ブラウザが通信を止める |
 | ⑦ | 起動確認 | ビルドしたサイトを⑥と同じ条件で配信し、ポータルと各アプリを実際のブラウザで開いて、表示・エラー・外部通信・CSP違反がないかを確認 |
+
+あわせて、**部内テストの申告**を確認します（`.github/workflows/dept-test.yml`）。
+市民の PR は、本文の「部内テスト（必須）」欄（テストした部署・役割、確認した内容、実施済みのチェック）が
+記入されていないと失敗します。下書き（Draft）の間と、管理者（CODEOWNERS）の PR は対象外です。
+PR 本文を編集すると自動で再確認されます。申告は自己申告のため、内容の妥当性は AI担当が確認します。
 
 ローカルでは `npm run check:safety`、`npm run build && npm run smoke` で同じ確認ができます。
 
