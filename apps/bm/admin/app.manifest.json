@@ -1,0 +1,10 @@
+{
+  "name": "総務管理（準備中）",
+  "description": "備品申請の承認や在庫管理を行う総務担当向けの画面です。",
+  "category": "管理",
+  "icon": "🗂️",
+  "color": "#06a77d",
+  "owner": "総務G",
+  "status": "preparing",
+  "access": ["general-affairs"]
+}

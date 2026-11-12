@@ -1,0 +1,25 @@
+{
+  "name": "citizen-app-pilot",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "portal",
+    "apps/*/*"
+  ],
+  "scripts": {
+    "generate": "node tools/generate.mjs",
+    "check:manifests": "node tools/generate.mjs --check",
+    "new-app": "node tools/new-app.mjs",
+    "test": "vitest run tools && npm run test --workspaces --if-present",
+    "build": "node tools/build.mjs",
+    "dev:portal": "npm run dev -w portal",
+    "check:scope": "node tools/check-scope.mjs",
+    "check:safety": "node tools/check-safety.mjs",
+    "smoke": "node tools/smoke.mjs"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.5",
+    "playwright": "1.63.0"
+  }
+}

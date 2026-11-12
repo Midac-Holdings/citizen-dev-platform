@@ -1,0 +1,10 @@
+{
+  "name": "備品申請",
+  "description": "文房具やPC周辺機器などの備品を申請できます。",
+  "category": "申請・手続き",
+  "icon": "📦",
+  "color": "#2bb673",
+  "owner": "総務G",
+  "status": "available",
+  "access": ["authenticated"]
+}
