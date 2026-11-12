@@ -94,7 +94,7 @@ export default function App({ apps = portalApps, loadViewer }: Props) {
       </main>
 
       <footer className="footer">
-        市民開発パイロット。アプリの公開は、GitHubでの承認（プルリクエスト）を経て自動で行われます。
+        市民開発基盤APP。アプリの公開は、GitHubでの承認（プルリクエスト）を経て自動で行われます。
       </footer>
     </div>
   );

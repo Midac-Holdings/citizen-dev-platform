@@ -1,4 +1,4 @@
-# citizen-app-pilot（市民開発パイロット）
+# citizen-dev-platform（市民開発基盤APP）
 
 社員（市民開発者）が Claude Code で作った社内アプリを、
 **GitHub でプルリクエスト → 自動チェック → AI担当が承認 → 自動で公開**する流れを試すリポジトリです。
@@ -17,6 +17,9 @@ AI担当：内容とプレビューを確認 ─▶ Approve（承認）→ Merge
                                     ▼
                      本番に自動公開 → ポータルにカードが出る
 ```
+
+- 公開先：https://lively-moss-0403f1500.6.azurestaticapps.net （Azure Static Web Apps「citizen-app-platform」、Free プラン）
+- リポジトリ：https://github.com/Midac-Holdings/citizen-dev-platform
 
 ポータルと全アプリを **1つの Azure Static Web Apps** にまとめて公開します。
 ログインは1回で、アプリごとに利用できる人を分けられます。
@@ -94,7 +97,7 @@ npm run build                        # dist/ に1つのサイトとしてまと�
 トークン未登録の間は、チェックだけ実行して公開はスキップされます。
 
 ### GitHub
-1. 「Settings → General」で**リポジトリを Public** にする（無料プランでブランチ保護を使うため）
+1. 「Settings → General」で**リポジトリを Public** にする（組織が GitHub Free のため。Team プラン以上なら Private のままでブランチ保護を使える）
 2. 「Settings → Branches → Add branch protection rule」（対象：`main`）
    - ✅ Require a pull request before merging
      - ✅ Require approvals（1）
