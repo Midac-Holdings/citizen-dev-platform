@@ -19,19 +19,23 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  check:
-    name: チェック（秘密情報・申告・テスト・ビルド）
+  check-and-deploy:
+    name: チェック（秘密情報・申告・テスト・ビルド）と公開
     if: github.event_name == 'push' || github.event.action != 'closed'
     runs-on: ubuntu-latest
+    env:
+      SWA_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+      # 他人のフォーク（外部）からの PR では公開しない
+      CAN_DEPLOY: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 秘密情報（パスワード・APIキー等）が書かれていないか
         run: >
           docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2
           dir /repo --redact --verbose --exit-code 1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -46,33 +50,13 @@ jobs:
       - name: ビルド
         run: npm run build
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: site
-          path: dist
-          retention-days: 7
-
-  deploy:
-    name: ${{ github.event_name == 'push' && '本番に公開' || 'プレビューに公開' }}
-    needs: check
-    # 他人のフォーク（外部）からの PR では公開しない
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    runs-on: ubuntu-latest
-    env:
-      SWA_TOKEN: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
-    steps:
       - name: デプロイ用トークンの確認
         if: env.SWA_TOKEN == ''
-        run: echo "::warning::AZURE_STATIC_WEB_APPS_API_TOKEN が未登録のため公開をスキップしました（README の「Azure の準備」を参照）"
+        run: echo "::warning::AZURE_STATIC_WEB_APPS_API_TOKEN が未登録のため公開をスキップしました（README の「デモの準備」を参照）"
 
-      - uses: actions/download-artifact@v4
-        if: env.SWA_TOKEN != ''
-        with:
-          name: site
-          path: dist
-
-      - uses: Azure/static-web-apps-deploy@v1
-        if: env.SWA_TOKEN != ''
+      - name: ${{ github.event_name == 'push' && '本番に公開' || 'プレビュー環境に公開' }}
+        if: env.SWA_TOKEN != '' && env.CAN_DEPLOY == 'true'
+        uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}

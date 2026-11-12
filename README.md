@@ -99,7 +99,7 @@ npm run build                        # dist/ に1つのサイトとしてまと�
    - ✅ Require a pull request before merging
      - ✅ Require approvals（1）
      - ✅ Require review from Code Owners
-   - ✅ Require status checks to pass → 「チェック（秘密情報・申告・テスト・ビルド）」を選ぶ
+   - ✅ Require status checks to pass → 「チェック（秘密情報・申告・テスト・ビルド）と公開」を選ぶ
    - ✅ Do not allow bypassing the above settings
 3. 市民役の GitHub アカウントを「Settings → Collaborators」で招待する
    （自分の PR は自分で承認できないため、市民役と AI担当役は別アカウントが必要）
