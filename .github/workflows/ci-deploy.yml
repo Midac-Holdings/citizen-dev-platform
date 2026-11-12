@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   check-and-deploy:
-    name: チェック（秘密情報・申告・テスト・ビルド）と公開
+    name: チェックと公開
     if: github.event_name == 'push' || github.event.action != 'closed'
     runs-on: ubuntu-latest
     env:
@@ -29,6 +29,14 @@ jobs:
       CAN_DEPLOY: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2 # PR の変更内容を比べるため
+
+      - name: ④ 変更範囲（自分のアプリのフォルダ以外を変更していないか）
+        if: github.event_name == 'pull_request'
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: node tools/check-scope.mjs HEAD^1
 
       - name: 秘密情報（パスワード・APIキー等）が書かれていないか
         run: >
@@ -44,11 +52,19 @@ jobs:
       - name: アプリの申告（app.manifest.json）
         run: npm run check:manifests
 
+      - name: ⑤ 禁止パターン（外部送信・eval・HTMLの直接書き込み・認証処理 等）
+        run: npm run check:safety
+
       - name: テスト
         run: npm test
 
       - name: ビルド
         run: npm run build
+
+      - name: ⑦ 起動確認（ブラウザで開き、エラー・外部通信・CSP違反がないか）
+        run: |
+          npx playwright install --with-deps chromium
+          npm run smoke
 
       - name: デプロイ用トークンの確認
         if: env.SWA_TOKEN == ''

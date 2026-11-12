@@ -7,7 +7,7 @@
 市民：Claude Code でアプリを作る ─▶ PR を出す
                                     │
                                     ▼
-                     自動チェック（秘密情報スキャン・申告の確認・テスト・ビルド）
+                     自動チェック（下の「自動チェック」の①〜⑦）
                                     │
                                     ▼
                      プレビュー環境に公開（PR にURLがコメントされる・ログイン必須）
@@ -99,16 +99,43 @@ npm run build                        # dist/ に1つのサイトとしてまと�
    - ✅ Require a pull request before merging
      - ✅ Require approvals（1）
      - ✅ Require review from Code Owners
-   - ✅ Require status checks to pass → 「チェック（秘密情報・申告・テスト・ビルド）と公開」を選ぶ
+   - ✅ Require status checks to pass → 「チェックと公開」を選ぶ
    - ✅ Do not allow bypassing the above settings
 3. 市民役の GitHub アカウントを「Settings → Collaborators」で招待する
    （自分の PR は自分で承認できないため、市民役と AI担当役は別アカウントが必要）
+
+### GitHub のセキュリティ機能（公開リポジトリなら無料）
+「Settings → Code security」で次を有効にする。
+- Dependabot alerts / security updates（使っているライブラリの脆弱性）
+- Code scanning → CodeQL「Default setup」（コードの脆弱性）
+- Secret Protection → Push protection（鍵を含む push をその場で止める）
+
+## 自動チェック
+
+PR のたびに次を実行し、1つでも失敗すると承認・マージできません（ブランチ保護を設定した場合）。
+
+| # | チェック | 内容 |
+|---|---|---|
+| ① | 秘密情報 | パスワード・APIキー・トークンがコードにないか（gitleaks） |
+| ② | 申告 | app.manifest.json の項目・利用できるロールが正しいか |
+| ③ | テスト・ビルド | テストが通り、公開用にまとめられるか |
+| ④ | 変更範囲 | 市民の PR が自分のアプリのフォルダ（`apps/<部署>/<アプリ>/`）以外を変更していないか。1つの PR で変更できるアプリは1つ。ポータル・仕組み・テンプレートの変更は CODEOWNERS（管理者）の PR のみ |
+| ⑤ | 禁止パターン | 外部URL・通信処理・`eval`・HTMLの直接書き込み・Cookie・ログイン処理・環境変数を検出 |
+| ⑥ | ブラウザでの送信制限（CSP） | サイト全体に「自社サイト以外からの読み込み・自社サイト以外への送信は禁止」のヘッダーを付ける。⑤をすり抜けても、ブラウザが通信を止める |
+| ⑦ | 起動確認 | ビルドしたサイトを⑥と同じ条件で配信し、ポータルと各アプリを実際のブラウザで開いて、表示・エラー・外部通信・CSP違反がないかを確認 |
+
+ローカルでは `npm run check:safety`、`npm run build && npm run smoke` で同じ確認ができます。
+
+**AI担当がすること**：①〜⑦がすべて成功していることを確認し、プレビュー環境で動作を触って、PR のチェックリストを確認してから承認する。
 
 ## デモの流れ（例）
 
 1. **市民役**：Claude Code に「BM部の会議室予約アプリを作って」と依頼
    → `npm run new-app -- bm meeting-room` から作成、テスト、PR を作成
-2. **自動チェック**：PR に結果が表示される（わざとAPIキーを書くと秘密情報スキャンで失敗）
+2. **自動チェック**：PR に結果が表示される。止まる場面も見せられる：
+   - APIキーらしき文字列を書く → ① で失敗
+   - `fetch('https://example.com/collect', …)` で外部にデータを送る → ⑤ で失敗（⑤を外しても ⑦ で CSP 違反として失敗）
+   - ポータルや他人のアプリを書き換える → ④ で失敗
 3. **プレビュー**：PR にプレビューURLがコメントされる。ログインして動作を確認
 4. **AI担当役**：PR のチェックリストを確認 → Approve → Merge
 5. **本番公開**：数分でポータルに「会議室予約」カードが追加され、`/bm/meeting-room/` で開ける

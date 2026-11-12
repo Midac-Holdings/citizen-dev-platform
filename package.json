@@ -13,9 +13,13 @@
     "new-app": "node tools/new-app.mjs",
     "test": "vitest run tools && npm run test --workspaces --if-present",
     "build": "node tools/build.mjs",
-    "dev:portal": "npm run dev -w portal"
+    "dev:portal": "npm run dev -w portal",
+    "check:scope": "node tools/check-scope.mjs",
+    "check:safety": "node tools/check-safety.mjs",
+    "smoke": "node tools/smoke.mjs"
   },
   "devDependencies": {
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "playwright": "1.63.0"
   }
 }

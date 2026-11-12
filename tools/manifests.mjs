@@ -81,6 +81,19 @@ export function toPortalApps(apps) {
   }));
 }
 
+export const CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data:",
+  "font-src 'self' data:",
+  "connect-src 'self'",
+  "form-action 'self'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "frame-ancestors 'none'",
+].join('; ');
+
 /** Azure Static Web Apps の設定。パスごとに利用できるロールを指定する。 */
 export function toSwaConfig(apps) {
   const appRoutes = apps.map(({ dept, app, manifest }) => ({
@@ -102,7 +115,10 @@ export function toSwaConfig(apps) {
       404: { rewrite: '/404.html', statusCode: 404 },
     },
     globalHeaders: {
+      // ⑥ ブラウザでの送信制限：自社サイト以外からの読み込み・自社サイト以外への送信を禁止する
+      'Content-Security-Policy': CSP,
       'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
       'Referrer-Policy': 'same-origin',
     },
   };
