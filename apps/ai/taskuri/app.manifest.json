@@ -1,0 +1,10 @@
+{
+  "name": "タスクリ",
+  "description": "受信メールからAIが今日やるべきタスクを見つけて一覧にします（現在はサンプルデータで表示）。",
+  "category": "サポート",
+  "icon": "📋",
+  "color": "#5b5bd6",
+  "owner": "AI担当",
+  "status": "available",
+  "access": ["authenticated"]
+}
