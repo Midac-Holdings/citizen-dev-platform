@@ -60,3 +60,8 @@ button.secondary { background: #ececfb; color: #3a3aa0; }
 .done { margin: 0; color: #1e6b3a; font-weight: 700; }
 .muted { color: var(--muted); margin: 0; }
 @media (max-width: 420px) { .tab { padding: 8px 4px; font-size: 0.9rem; } .count { margin-left: 4px; } .header h1 { font-size: 1.4rem; } }
+
+.mailcard .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+.mailcard .row label { flex: 0 0 auto; }
+.mail a { font-size: 0.85rem; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }

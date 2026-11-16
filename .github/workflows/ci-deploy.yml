@@ -79,6 +79,8 @@ jobs:
           action: upload
           app_location: dist
           skip_app_build: true
+          # 基盤の API（Azure Functions）。管理者が管理する api/ をそのまま載せる（依存関係は Azure 側でインストール）
+          api_location: api
 
   close-preview:
     name: プレビュー環境を削除

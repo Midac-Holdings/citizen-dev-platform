@@ -1,9 +1,10 @@
 /**
  * タスクのデータと操作。
  *
- * いまはサンプルデータ（張りぼて）。項目は基盤の SharePoint リスト「TaskuriTasks」と同じにしてあるので、
- * 本番では loadTasks() の中身を AI担当が用意する部品（getMyTasks）に差し替えるだけで済む。
- * 完了・対象外の操作と設定は、このブラウザ内（localStorage）にだけ保存する。
+ * 表示するタスクは2種類：
+ *   - サンプル（張りぼて）：sampleTasks()
+ *   - 実際のメールから AI が抽出したもの：extract.ts で作り、saveMailTasks() でこのブラウザ内に保存
+ * 完了・対象外の操作と設定も、このブラウザ内（localStorage）にだけ保存する。
  */
 
 export const ACTION_TYPES = ['返信', '対応', '確認', '承認', '提出', '参加', 'その他'] as const;
@@ -33,6 +34,8 @@ export interface Task {
   mailFrom: string;
   /** ISO 日時 */
   mailReceivedAt: string;
+  /** Outlook でメールを開くリンク（実メールのときだけ） */
+  mailLink?: string;
 }
 
 // ---------------------------------------------------------------- 日付
@@ -238,10 +241,39 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-/** タスクを読み込む（いまはサンプル＋このブラウザで変えた状態） */
+const MAIL_TASKS_KEY = 'ai-taskuri.mailTasks';
+
+/** 実メールから抽出した結果（このブラウザ内に保存） */
+export interface MailExtraction {
+  /** 抽出した日時（ISO） */
+  extractedAt: string;
+  days: number;
+  mails: number;
+  tasks: Task[];
+}
+
+export function loadMailExtraction(): MailExtraction | null {
+  const x = readJson<MailExtraction | null>(MAIL_TASKS_KEY, null);
+  return x && Array.isArray(x.tasks) ? x : null;
+}
+
+export function saveMailExtraction(x: MailExtraction): void {
+  writeJson(MAIL_TASKS_KEY, x);
+}
+
+export function clearMailExtraction(): void {
+  try {
+    localStorage.removeItem(MAIL_TASKS_KEY);
+  } catch {
+    // 何もしない
+  }
+}
+
+/** タスクを読み込む（実メールの抽出結果があればそれ、なければサンプル。完了などの状態を反映） */
 export function loadTasks(today: Date): Task[] {
   const saved = readJson<StatusMap>(STATUS_KEY, {});
-  return sampleTasks(today).map((t) => {
+  const base = loadMailExtraction()?.tasks ?? sampleTasks(today);
+  return base.map((t) => {
     const s = saved[t.id];
     return s && (STATUSES as readonly string[]).includes(s) ? { ...t, status: s } : t;
   });

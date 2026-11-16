@@ -1,6 +1,12 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { isEntraConfigured } from './config';
+import { extractFromMail, type Progress } from './extract';
+import { completeSignIn, isReturningFromSignIn } from './graph';
 import {
   VIEWS,
+  clearMailExtraction,
+  loadMailExtraction,
+  saveMailExtraction,
   dueLabel,
   filterTasks,
   isOverdue,
@@ -14,15 +20,84 @@ import {
   type View,
 } from './tasks';
 
+/** メールからの抽出に使う部品（テストで差し替えられるようにする） */
+export interface MailDeps {
+  configured: () => boolean;
+  returning: () => boolean;
+  completeSignIn: () => Promise<boolean>;
+  extract: typeof extractFromMail;
+}
+
+const defaultMailDeps: MailDeps = {
+  configured: isEntraConfigured,
+  returning: isReturningFromSignIn,
+  completeSignIn,
+  extract: extractFromMail,
+};
+
+const PENDING_KEY = 'ai-taskuri.pendingDays';
+const DAY_OPTIONS = [7, 14, 30] as const;
+
 interface Props {
   /** テスト用に「今日」を固定できるようにする */
   today?: Date;
+  mail?: MailDeps;
 }
 
-export default function App({ today: todayProp }: Props) {
+export default function App({ today: todayProp, mail = defaultMailDeps }: Props) {
   const today = useMemo(() => todayProp ?? new Date(), [todayProp]);
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks(today));
   const [view, setView] = useState<View>('今日やる');
+  const [extraction, setExtraction] = useState(loadMailExtraction);
+  const [progress, setProgress] = useState<Progress | null>(null);
+  const [days, setDays] = useState<number>(30);
+  const started = useRef(false);
+
+  async function runExtraction(d: number) {
+    try {
+      sessionStorage.setItem(PENDING_KEY, String(d));
+    } catch {
+      // 保存できなくても続ける
+    }
+    try {
+      const result = await mail.extract(d, today, setProgress);
+      if (!result) return; // サインインのため Microsoft の画面へ移動中
+      sessionStorage.removeItem(PENDING_KEY);
+      const x = { extractedAt: new Date().toISOString(), days: d, mails: result.mails, tasks: result.tasks };
+      saveMailExtraction(x);
+      setExtraction(x);
+      setTasks(loadTasks(today));
+      setView('今日やる');
+    } catch (e) {
+      sessionStorage.removeItem(PENDING_KEY);
+      setProgress({ phase: 'error', message: e instanceof Error ? e.message : String(e) });
+    }
+  }
+
+  // サインインから戻ってきたら、続きを自動で実行する
+  useEffect(() => {
+    if (started.current || !mail.configured() || !mail.returning()) return;
+    started.current = true;
+    const pending = Number(sessionStorage.getItem(PENDING_KEY) ?? '30') || 30;
+    setDays(pending);
+    setProgress({ phase: 'signing-in' });
+    mail
+      .completeSignIn()
+      .then((ok) => {
+        window.history.replaceState(null, '', window.location.pathname);
+        if (ok) return runExtraction(pending);
+        setProgress({ phase: 'error', message: 'サインインできませんでした。もう一度お試しください' });
+      })
+      .catch((e: unknown) => setProgress({ phase: 'error', message: e instanceof Error ? e.message : String(e) }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function backToSample() {
+    clearMailExtraction();
+    setExtraction(null);
+    setProgress(null);
+    setTasks(loadTasks(today));
+  }
 
   const shown = filterTasks(tasks, view, today);
   const counts = {
@@ -43,7 +118,9 @@ export default function App({ today: todayProp }: Props) {
   return (
     <div className="page">
       <p className="notice" role="note">
-        デモ：サンプルデータを表示しています。完了の操作や設定は、このブラウザ内にだけ保存されます
+        {extraction
+          ? 'デモ：あなたの受信メールを AI が読み取った結果です。結果と完了の操作は、このブラウザ内にだけ保存されます'
+          : 'デモ：サンプルデータを表示しています。完了の操作や設定は、このブラウザ内にだけ保存されます'}
       </p>
       <header className="header">
         <a className="back" href="/">← ポータルに戻る</a>
@@ -52,6 +129,16 @@ export default function App({ today: todayProp }: Props) {
       </header>
 
       <main className="main">
+        <MailCard
+          configured={mail.configured()}
+          extraction={extraction}
+          progress={progress}
+          days={days}
+          onDays={setDays}
+          onRun={() => runExtraction(days)}
+          onSample={backToSample}
+        />
+
         <nav className="tabs" aria-label="表示の切り替え">
           {VIEWS.map((v) => (
             <button
@@ -98,6 +185,14 @@ function TaskCard({ task: t, today, onStatus }: { task: Task; today: Date; onSta
       <p className="detail">{t.detail}</p>
       <p className="mail">
         ✉️ {t.mailFrom}「{t.mailSubject}」
+        {t.mailLink && (
+          <>
+            {' '}
+            <a href={t.mailLink} target="_blank" rel="noopener noreferrer">
+              Outlookで開く
+            </a>
+          </>
+        )}
       </p>
       <details className="why">
         <summary>
@@ -125,6 +220,80 @@ function TaskCard({ task: t, today, onStatus }: { task: Task; today: Date; onSta
   );
 }
 
+function progressText(p: Progress): string {
+  switch (p.phase) {
+    case 'signing-in':
+      return 'Microsoft 365 にサインインしています…';
+    case 'reading':
+      return '受信メールを読み込んでいます…';
+    case 'extracting':
+      return `AI がタスクを探しています…（${p.done} / ${p.total} 通）`;
+    case 'done':
+      return `完了：メール ${p.mails} 通から、タスクを ${p.tasks} 件見つけました`;
+    case 'error':
+      return p.message;
+  }
+}
+
+function MailCard(props: {
+  configured: boolean;
+  extraction: ReturnType<typeof loadMailExtraction>;
+  progress: Progress | null;
+  days: number;
+  onDays: (d: number) => void;
+  onRun: () => void;
+  onSample: () => void;
+}) {
+  const { configured, extraction, progress, days, onDays, onRun, onSample } = props;
+  const busy = progress !== null && progress.phase !== 'done' && progress.phase !== 'error';
+  return (
+    <section className="card mailcard" aria-label="メールから抽出">
+      <h2>📥 実際のメールから抽出</h2>
+      {extraction ? (
+        <p className="muted">
+          {new Date(extraction.extractedAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+          に、過去{extraction.days}日のメール {extraction.mails} 通から {extraction.tasks.length} 件を抽出しました。
+        </p>
+      ) : (
+        <p className="muted">
+          Microsoft 365 にサインインし、受信トレイのメール（最大100通）を AI が読んでタスクを探します。
+          メール本文は社内の Azure OpenAI に送られ、保存はされません。
+        </p>
+      )}
+      {!configured && (
+        <p className="error" role="alert">
+          管理者の設定待ちです（Microsoft 365 へのサインインの設定がまだありません）
+        </p>
+      )}
+      <div className="row">
+        <label>
+          期間
+          <select value={days} onChange={(e) => onDays(Number(e.target.value))} disabled={busy}>
+            {DAY_OPTIONS.map((d) => (
+              <option key={d} value={d}>
+                過去{d}日
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" onClick={onRun} disabled={!configured || busy}>
+          {extraction ? 'もう一度抽出する' : 'メールを読み込んで抽出する'}
+        </button>
+        {extraction && (
+          <button type="button" className="secondary" onClick={onSample} disabled={busy}>
+            サンプルに戻す
+          </button>
+        )}
+      </div>
+      {progress && (
+        <p className={progress.phase === 'error' ? 'error' : 'done'} role={progress.phase === 'error' ? 'alert' : 'status'}>
+          {progressText(progress)}
+        </p>
+      )}
+    </section>
+  );
+}
+
 function SettingsCard() {
   const [settings, setSettings] = useState(loadSettings);
   const [runTime, setRunTime] = useState(settings.runTime);
@@ -149,6 +318,7 @@ function SettingsCard() {
       <h2>⚙️ 設定</h2>
       <p className="muted">
         毎朝 {settings.runTime} ごろ（{settings.weekdaysOnly ? '平日のみ' : '毎日'}）に、受信メールからタスクを作ります。
+        （デモ：自動実行はまだありません。上の「実際のメールから抽出」で手動で実行します）
       </p>
       <label>
         実行時刻

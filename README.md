@@ -76,6 +76,26 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 - ポータルのカード一覧（誰にどのカードを見せるか）
 - `staticwebapp.config.json`（どのパスを誰が開けるか。**サーバー側で制限**されます）
 
+## アプリごとの例外（外部との通信・API）
+
+標準の市民アプリは、⑤禁止パターンと⑥CSPにより外部と通信できません。業務上どうしても必要なアプリだけ、
+管理者（AI担当）が審査して `tools/app-capabilities.json` に登録し、例外を与えます（市民の PR ではこのファイルを変更できません）。
+
+| ケイパビリティ | 許可される内容 |
+|---|---|
+| `microsoft-graph-mail` | Microsoft 365 へのサインイン（MSAL）と Microsoft Graph との通信。そのアプリのパスだけ CSP に追加される |
+| `platform-api` | 基盤の API（`/api/<部署コード>-<アプリ名>/...`）の利用。API 本体は管理者が `api/` に置く |
+
+基盤の API（`api/`）は Azure Static Web Apps のマネージド関数（Node.js 22）として、サイトと一緒に公開されます。
+鍵などの設定値は、Azure Portal の静的 Web アプリ →「環境変数」に登録します（コードには書きません）。
+
+| 環境変数 | 用途 |
+|---|---|
+| `AZURE_OPENAI_ENDPOINT` | タスクリ：Azure OpenAI のエンドポイント（`https://<リソース名>.openai.azure.com`） |
+| `AZURE_OPENAI_API_KEY` | タスクリ：Azure OpenAI のキー |
+| `AZURE_OPENAI_DEPLOYMENT` | タスクリ：モデルのデプロイ名 |
+| `AZURE_OPENAI_API_VERSION` | （任意）API のバージョン。省略時は `2024-10-21` |
+
 ## コマンド
 
 ```bash

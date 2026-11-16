@@ -7,6 +7,7 @@ import { rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadApps, toSwaConfig } from './manifests.mjs';
+import { loadAppCapabilities } from './capabilities.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
@@ -31,5 +32,5 @@ for (const { dept, app, manifest } of apps) {
   run(['run', 'build', '-w', `apps/${dept}/${app}`, '--', '--base', base, '--outDir', join(dist, dept, app), '--emptyOutDir']);
 }
 
-writeFileSync(join(dist, 'staticwebapp.config.json'), JSON.stringify(toSwaConfig(apps), null, 2) + '\n');
+writeFileSync(join(dist, 'staticwebapp.config.json'), JSON.stringify(toSwaConfig(apps, loadAppCapabilities()), null, 2) + '\n');
 console.log(`\n✔ dist/ にまとめました（アプリ ${apps.length}件）`);

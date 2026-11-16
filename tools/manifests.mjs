@@ -2,6 +2,7 @@
 // ポータル台帳・Azure Static Web Apps 設定の生成。
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { capabilitiesFor } from './capabilities.mjs';
 
 export const CATEGORIES = ['申請・手続き', '施設・設備', 'お知らせ・情報', 'サポート', '管理'];
 export const STATUSES = ['available', 'preparing'];
@@ -81,25 +82,42 @@ export function toPortalApps(apps) {
   }));
 }
 
-export const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "form-action 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-].join('; ');
+/** CSP を組み立てる。connect / frame は、許可されたアプリだけ追加される。 */
+export function buildCsp({ connectSrc = [], frameSrc = [], frameAncestors = "'none'" } = {}) {
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    ['connect-src', "'self'", ...connectSrc].join(' '),
+    ['frame-src', ...(frameSrc.length ? frameSrc : ["'none'"])].join(' '),
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    `frame-ancestors ${frameAncestors}`,
+  ].join('; ');
+}
+
+export const CSP = buildCsp();
 
 /** Azure Static Web Apps の設定。パスごとに利用できるロールを指定する。 */
-export function toSwaConfig(apps) {
-  const appRoutes = apps.map(({ dept, app, manifest }) => ({
-    route: `/${dept}/${app}/*`,
-    allowedRoles: [...manifest.access],
-  }));
+export function toSwaConfig(apps, appCapabilities = {}) {
+  const appRoutes = [];
+  for (const { dept, app, manifest } of apps) {
+    const id = `${dept}-${app}`;
+    const caps = capabilitiesFor(id, appCapabilities);
+    const route = { route: `/${dept}/${app}/*`, allowedRoles: [...manifest.access] };
+    if (caps.connectSrc.length || caps.frameSrc.length) {
+      // 許可されたアプリだけ、通信先を追加した CSP に差し替える（サインイン用に同じサイト内の埋め込みも許可）
+      route.headers = {
+        'Content-Security-Policy': buildCsp({ connectSrc: caps.connectSrc, frameSrc: caps.frameSrc, frameAncestors: "'self'" }),
+        'X-Frame-Options': 'SAMEORIGIN',
+      };
+    }
+    appRoutes.push(route);
+    if (caps.api) appRoutes.push({ route: `/api/${id}/*`, allowedRoles: [...manifest.access] });
+  }
   return {
     routes: [
       // ログインは Microsoft（Entra ID）のみ
@@ -114,6 +132,7 @@ export function toSwaConfig(apps) {
       403: { rewrite: '/403.html', statusCode: 403 },
       404: { rewrite: '/404.html', statusCode: 404 },
     },
+    platform: { apiRuntime: 'node:22' },
     globalHeaders: {
       // ⑥ ブラウザでの送信制限：自社サイト以外からの読み込み・自社サイト以外への送信を禁止する
       'Content-Security-Policy': CSP,

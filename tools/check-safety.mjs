@@ -3,6 +3,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { capabilitiesFor, loadAppCapabilities } from './capabilities.mjs';
 
 export const RULES = [
   { id: 'external-url', re: /https?:\/\/(?!localhost[:/]|127\.0\.0\.1[:/])/i, message: '外部のURLが書かれています。外部サービスとの連携・外部ファイルの読み込みは AI担当に相談してください' },
@@ -18,14 +19,26 @@ const EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.html
 const SKIP_DIRS = new Set(['node_modules', 'dist']);
 const SKIP_FILES = /(\.test\.|\.spec\.|setupTests\.|^package(-lock)?\.json$|^tsconfig\.json$|^app\.manifest\.json$)/;
 
-/** 1ファイル分の検出結果。コメント行は対象外。 */
-export function scanSource(text) {
+const URL_IN_LINE = /https?:\/\/([a-z0-9.-]+)/gi;
+
+/**
+ * 1ファイル分の検出結果。コメント行は対象外。
+ * allow: 管理者が許可した例外（tools/app-capabilities.json）。
+ *   allowRules に含まれるルールは検出しない。ただし external-url は allowHosts のURLだけを許可する。
+ */
+export function scanSource(text, allow = { allowRules: [], allowHosts: [] }) {
   const findings = [];
   text.split('\n').forEach((line, i) => {
     const t = line.trim();
     if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('<!--')) return;
     for (const rule of RULES) {
-      if (rule.re.test(line)) findings.push({ line: i + 1, rule: rule.id, message: rule.message, text: t.slice(0, 120) });
+      if (!rule.re.test(line)) continue;
+      if (allow.allowRules.includes(rule.id)) {
+        if (rule.id !== 'external-url') continue;
+        const hosts = [...line.matchAll(URL_IN_LINE)].map((m) => m[1].toLowerCase());
+        if (hosts.every((h) => allow.allowHosts.includes(h) || h === 'localhost' || h === '127.0.0.1')) continue;
+      }
+      findings.push({ line: i + 1, rule: rule.id, message: rule.message, text: t.slice(0, 120) });
     }
   });
   return findings;
@@ -47,10 +60,13 @@ export function listFiles(dir) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const files = listFiles(join(root, 'apps'));
+  const appCapabilities = loadAppCapabilities();
   let count = 0;
   for (const file of files) {
     const rel = relative(root, file);
-    for (const f of scanSource(readFileSync(file, 'utf8'))) {
+    const m = rel.split(/[\\/]/);
+    const allow = m[1] && !m[1].startsWith('_') && m[2] ? capabilitiesFor(`${m[1]}-${m[2]}`, appCapabilities) : undefined;
+    for (const f of scanSource(readFileSync(file, 'utf8'), allow)) {
       count++;
       console.log(`::error file=${rel},line=${f.line}::${f.message}`);
       console.log(`  ${rel}:${f.line}  [${f.rule}]  ${f.text}`);
