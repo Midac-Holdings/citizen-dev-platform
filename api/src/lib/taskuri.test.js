@@ -1,15 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
-import { buildMessages, callAzureOpenAI, handleExtract, normalizeInput, sanitizeTasks } from './taskuri.js';
+import { buildMessages, callAzureOpenAI, handleExtract, normalizeInput, readConfig, sanitizeTasks } from './taskuri.js';
 
 const principal = (roles = ['anonymous', 'authenticated']) =>
   Buffer.from(JSON.stringify({ userId: 'u1', userDetails: 'taro@example.com', userRoles: roles })).toString('base64');
 const mail = (id, extra = {}) => ({ id, receivedAt: '2026-11-16T00:00:00Z', from: '佐藤', subject: '見積の件', position: 'to-only', toCount: 1, ccCount: 0, body: '本日中にご回答ください', ...extra });
 const body = { today: '2026-11-16', me: { name: '山田', email: 'yamada@example.com' }, mails: [mail('m1'), mail('m2', { position: 'cc' })] };
 const env = { AZURE_OPENAI_ENDPOINT: 'https://example.openai.azure.com/', AZURE_OPENAI_API_KEY: 'test-key', AZURE_OPENAI_DEPLOYMENT: 'gpt-4o-mini' };
-const aiReply = (content, status = 200, finish = 'stop') => ({
+const aiReply = (content, status = 200, extra = {}) => ({
   ok: status < 400,
   status,
-  json: async () => ({ choices: [{ finish_reason: finish, message: { content: JSON.stringify(content) } }] }),
+  json: async () => ({
+    status: 'completed',
+    output: [
+      { type: 'reasoning', summary: [] },
+      { type: 'message', content: [{ type: 'output_text', text: JSON.stringify(content) }] },
+    ],
+    ...extra,
+  }),
   text: async () => 'error body',
 });
 
@@ -49,20 +56,37 @@ describe('AI の出力の整形', () => {
   });
 });
 
-describe('Azure OpenAI の呼び出し', () => {
-  it('構造化出力で呼び、URL・キーを正しく付ける', async () => {
+describe('Azure OpenAI の呼び出し（Responses API）', () => {
+  const cfg = { endpoint: 'https://x.openai.azure.com', apiKey: 'k', deployment: 'gpt-5.6-luna', apiVersion: '2025-04-01-preview', reasoningEffort: 'low' };
+
+  it('構造化出力・考える深さを指定し、URL・キー・デプロイ名を正しく付ける', async () => {
     const fetchFn = vi.fn(async () => aiReply({ tasks: [] }));
-    await callAzureOpenAI({ endpoint: 'https://x.openai.azure.com', apiKey: 'k', deployment: 'dep', apiVersion: '2024-10-21' }, [], fetchFn);
+    expect(await callAzureOpenAI(cfg, [{ role: 'user', content: 'x' }], fetchFn)).toEqual({ tasks: [] });
     const [url, init] = fetchFn.mock.calls[0];
-    expect(url).toBe('https://x.openai.azure.com/openai/deployments/dep/chat/completions?api-version=2024-10-21');
+    expect(url).toBe('https://x.openai.azure.com/openai/responses?api-version=2025-04-01-preview');
     expect(init.headers['api-key']).toBe('k');
-    expect(JSON.parse(init.body).response_format.type).toBe('json_schema');
+    const sent = JSON.parse(init.body);
+    expect(sent).toMatchObject({ model: 'gpt-5.6-luna', reasoning: { effort: 'low' }, text: { format: { type: 'json_schema', strict: true } } });
   });
 
-  it('構造化出力に未対応（400）なら JSON モードで再試行する', async () => {
-    const fetchFn = vi.fn().mockResolvedValueOnce(aiReply({}, 400)).mockResolvedValueOnce(aiReply({ tasks: [] }));
-    await callAzureOpenAI({ endpoint: 'https://x', apiKey: 'k', deployment: 'd', apiVersion: 'v' }, [], fetchFn);
-    expect(JSON.parse(fetchFn.mock.calls[1][1].body).response_format.type).toBe('json_object');
+  it('400 なら指定を減らして再試行する（reasoning なし → JSON モード）', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(aiReply({}, 400)).mockResolvedValueOnce(aiReply({}, 400)).mockResolvedValueOnce(aiReply({ tasks: [] }));
+    await callAzureOpenAI(cfg, [], fetchFn);
+    expect(JSON.parse(fetchFn.mock.calls[1][1].body).reasoning).toBeUndefined();
+    expect(JSON.parse(fetchFn.mock.calls[2][1].body).text.format.type).toBe('json_object');
+  });
+
+  it('時間内に返らなければ 504', async () => {
+    const fetchFn = vi.fn((_u, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))));
+    await expect(callAzureOpenAI(cfg, [], fetchFn, 10)).rejects.toMatchObject({ status: 504 });
+  });
+});
+
+describe('設定の読み込み', () => {
+  it('ターゲットURIをそのまま貼っても、エンドポイント部分だけを使う', () => {
+    const { cfg } = readConfig({ ...env, AZURE_OPENAI_ENDPOINT: 'https://x.openai.azure.com/openai/responses?api-version=2025-04-01-preview' });
+    expect(cfg.endpoint).toBe('https://x.openai.azure.com');
+    expect(cfg.apiVersion).toBe('2025-04-01-preview');
   });
 });
 
@@ -90,7 +114,7 @@ describe('API の処理（handleExtract）', () => {
   });
 
   it('コンテンツフィルターは 422、その他の失敗は 502', async () => {
-    const filtered = await handleExtract({ principalHeader: principal(), body, env, fetchFn: async () => aiReply({}, 200, 'content_filter') });
+    const filtered = await handleExtract({ principalHeader: principal(), body, env, fetchFn: async () => aiReply({}, 200, { status: 'incomplete', incomplete_details: { reason: 'content_filter' } }) });
     expect(filtered.status).toBe(422);
     const failed = await handleExtract({ principalHeader: principal(), body, env, fetchFn: async () => aiReply({}, 500) });
     expect(failed.status).toBe(502);

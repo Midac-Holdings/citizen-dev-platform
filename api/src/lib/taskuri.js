@@ -117,34 +117,62 @@ export function sanitizeTasks(raw, mails) {
 /** Azure OpenAI の設定（Static Web Apps の環境変数）。足りなければ { missing } */
 export function readConfig(env) {
   const cfg = {
-    endpoint: (env.AZURE_OPENAI_ENDPOINT ?? '').replace(/\/+$/, ''),
+    endpoint: (env.AZURE_OPENAI_ENDPOINT ?? '').replace(/\/+$/, '').replace(/\/openai(\/.*)?$/, ''),
     apiKey: env.AZURE_OPENAI_API_KEY ?? '',
     deployment: env.AZURE_OPENAI_DEPLOYMENT ?? '',
-    apiVersion: env.AZURE_OPENAI_API_VERSION || '2024-10-21',
+    apiVersion: env.AZURE_OPENAI_API_VERSION || '2025-04-01-preview',
+    // 推論モデル（gpt-5 系など）の考える深さ。関数の時間制限（約45秒）に収めるため既定は low
+    reasoningEffort: env.AZURE_OPENAI_REASONING_EFFORT || 'low',
   };
   const missing = ['AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY', 'AZURE_OPENAI_DEPLOYMENT'].filter((k) => !env[k]);
   return missing.length ? { missing } : { cfg };
 }
 
-/**
- * Azure OpenAI（Chat Completions）を呼んで JSON を受け取る。
- * 構造化出力（json_schema）に対応していないモデルでは、JSON モードで再試行する。
- */
-export async function callAzureOpenAI(cfg, messages, fetchFn = fetch) {
-  const url = `${cfg.endpoint}/openai/deployments/${encodeURIComponent(cfg.deployment)}/chat/completions?api-version=${encodeURIComponent(cfg.apiVersion)}`;
-  const send = (responseFormat, extraMessages = []) =>
-    fetchFn(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'api-key': cfg.apiKey },
-      body: JSON.stringify({ messages: [...messages, ...extraMessages], response_format: responseFormat }),
-    });
+/** Responses API の応答から、出力テキストを取り出す */
+export function outputText(data) {
+  if (typeof data?.output_text === 'string') return data.output_text;
+  return (data?.output ?? [])
+    .filter((item) => item?.type === 'message')
+    .flatMap((item) => item.content ?? [])
+    .filter((c) => c?.type === 'output_text')
+    .map((c) => c.text)
+    .join('');
+}
 
-  let res = await send({ type: 'json_schema', json_schema: { name: 'tasks', strict: true, schema: TASKS_SCHEMA } });
-  if (res.status === 400) {
-    // 古いモデル・API バージョン向け：JSON モード＋スキーマを文章で指示
-    res = await send({ type: 'json_object' }, [
-      { role: 'system', content: `出力は次の JSON スキーマに従う JSON オブジェクトのみ：${JSON.stringify(TASKS_SCHEMA)}` },
-    ]);
+/**
+ * Azure OpenAI（Responses API）を呼んで JSON を受け取る。
+ * - 構造化出力（json_schema）で呼ぶ。推論モデルには考える深さ（reasoning.effort）を指定する
+ * - 400 の場合は、指定を減らして再試行する（reasoning なし → JSON モード）
+ */
+export async function callAzureOpenAI(cfg, messages, fetchFn = fetch, timeoutMs = 40000) {
+  const url = `${cfg.endpoint}/openai/responses?api-version=${encodeURIComponent(cfg.apiVersion)}`;
+  const schemaFormat = { type: 'json_schema', name: 'tasks', strict: true, schema: TASKS_SCHEMA };
+  const jsonHint = { role: 'system', content: `出力は次の JSON スキーマに従う JSON オブジェクトのみ：${JSON.stringify(TASKS_SCHEMA)}` };
+  const attempts = [
+    { input: messages, text: { format: schemaFormat }, reasoning: { effort: cfg.reasoningEffort } },
+    { input: messages, text: { format: schemaFormat } },
+    { input: [...messages, jsonHint], text: { format: { type: 'json_object' } } },
+  ];
+
+  let res;
+  for (const attempt of attempts) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      res = await fetchFn(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'api-key': cfg.apiKey },
+        body: JSON.stringify({ model: cfg.deployment, ...attempt }),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      const err = new Error(e?.name === 'AbortError' ? 'Azure OpenAI の応答が時間内に返りませんでした' : `Azure OpenAI に接続できませんでした（${e?.message ?? e}）`);
+      err.status = 504;
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+    if (res.status !== 400) break;
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -154,14 +182,14 @@ export async function callAzureOpenAI(cfg, messages, fetchFn = fetch) {
     throw err;
   }
   const data = await res.json();
-  const choice = data?.choices?.[0];
-  if (choice?.finish_reason === 'content_filter') {
-    const err = new Error('Azure OpenAI のコンテンツフィルターで止められました');
-    err.status = 422;
+  if (data?.status === 'incomplete') {
+    const reason = data?.incomplete_details?.reason;
+    const err = new Error(reason === 'content_filter' ? 'Azure OpenAI のコンテンツフィルターで止められました' : `Azure OpenAI の応答が途中で終わりました（${reason ?? '理由不明'}）`);
+    err.status = reason === 'content_filter' ? 422 : 502;
     throw err;
   }
   try {
-    return JSON.parse(choice?.message?.content ?? '');
+    return JSON.parse(outputText(data));
   } catch {
     const err = new Error('Azure OpenAI の応答を JSON として読めませんでした');
     err.status = 502;
@@ -201,6 +229,6 @@ export async function handleExtract({ principalHeader, body, env, fetchFn = fetc
     return { status: 200, jsonBody: { tasks } };
   } catch (e) {
     log(`taskuri: ${e.message} ${e.detail ?? ''}`);
-    return { status: e.status === 422 ? 422 : 502, jsonBody: { error: e.message } };
+    return { status: [422, 504].includes(e.status) ? e.status : 502, jsonBody: { error: e.message } };
   }
 }

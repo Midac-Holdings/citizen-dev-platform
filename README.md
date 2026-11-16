@@ -91,10 +91,11 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 
 | 環境変数 | 用途 |
 |---|---|
-| `AZURE_OPENAI_ENDPOINT` | タスクリ：Azure OpenAI のエンドポイント（`https://<リソース名>.openai.azure.com`） |
+| `AZURE_OPENAI_ENDPOINT` | タスクリ：Azure OpenAI のエンドポイント（`https://<リソース名>.openai.azure.com`。ターゲットURIを貼っても可） |
 | `AZURE_OPENAI_API_KEY` | タスクリ：Azure OpenAI のキー |
 | `AZURE_OPENAI_DEPLOYMENT` | タスクリ：モデルのデプロイ名 |
-| `AZURE_OPENAI_API_VERSION` | （任意）API のバージョン。省略時は `2024-10-21` |
+| `AZURE_OPENAI_API_VERSION` | （任意）Responses API のバージョン。省略時は `2025-04-01-preview` |
+| `AZURE_OPENAI_REASONING_EFFORT` | （任意）推論モデルの考える深さ。省略時は `low`（関数の時間制限に収めるため） |
 
 ## コマンド
 

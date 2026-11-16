@@ -14,7 +14,7 @@ export const GRAPH_SCOPES = ['User.Read', 'Mail.Read'];
 /** 一度に読むメールの上限（AI の利用料と待ち時間を抑えるため） */
 export const MAX_MAILS = 100;
 
-/** API 1回あたりのメール数（基盤の API の上限と同じ） */
-export const MAILS_PER_REQUEST = 10;
+/** API 1回あたりのメール数（AI の応答を関数の時間制限（約45秒）に収めるため少なめ。API の上限は10） */
+export const MAILS_PER_REQUEST = 5;
 
 export const isEntraConfigured = () => ENTRA.tenantId !== '' && ENTRA.clientId !== '';
