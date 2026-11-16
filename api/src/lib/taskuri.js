@@ -176,7 +176,15 @@ export async function callAzureOpenAI(cfg, messages, fetchFn = fetch, timeoutMs 
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const err = new Error(`Azure OpenAI がエラーを返しました（HTTP ${res.status}）`);
+    // 原因の切り分け用に、Azure OpenAI のエラーコードと説明（鍵などは含まれない）を画面に出す
+    let reason = '';
+    try {
+      const e = JSON.parse(text)?.error;
+      reason = [e?.code, e?.message].filter(Boolean).join('：').replace(/\s+/g, ' ').slice(0, 200);
+    } catch {
+      reason = '';
+    }
+    const err = new Error(`Azure OpenAI がエラーを返しました（HTTP ${res.status}${reason ? `／${reason}` : ''}）`);
     err.status = res.status;
     err.detail = text.slice(0, 500);
     throw err;

@@ -76,6 +76,11 @@ describe('Azure OpenAI の呼び出し（Responses API）', () => {
     expect(JSON.parse(fetchFn.mock.calls[2][1].body).text.format.type).toBe('json_object');
   });
 
+  it('エラー時は Azure OpenAI のエラーコードと説明を添える', async () => {
+    const res = { ok: false, status: 403, text: async () => JSON.stringify({ error: { code: 'AuthenticationTypeDisabled', message: 'Key based authentication is disabled for this resource.' } }) };
+    await expect(callAzureOpenAI(cfg, [], async () => res)).rejects.toThrow('HTTP 403／AuthenticationTypeDisabled：Key based authentication is disabled');
+  });
+
   it('時間内に返らなければ 504', async () => {
     const fetchFn = vi.fn((_u, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })))));
     await expect(callAzureOpenAI(cfg, [], fetchFn, 10)).rejects.toMatchObject({ status: 504 });
