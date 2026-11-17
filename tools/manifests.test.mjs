@@ -37,6 +37,7 @@ describe('validateApp', () => {
     [{ access: [] }, '"access"'],
     [{ access: ['anonymous'] }, 'anonymous'],
     [{ access: ['BM Admin'] }, 'BM Admin'],
+    [{ access: ['bm-members'] }, 'アンダースコア'],
   ])('%o はエラー', (patch, word) => {
     expect(validateApp(entry(patch)).join()).toContain(word);
   });
@@ -69,13 +70,13 @@ describe('discoverApps / loadApps', () => {
 describe('toPortalApps / toSwaConfig', () => {
   const apps = [
     entry(),
-    entry({ name: '総務管理', status: 'preparing', access: ['general-affairs'] }, { app: 'admin', hasPackage: false }),
+    entry({ name: '総務管理', status: 'preparing', access: ['general_affairs'] }, { app: 'admin', hasPackage: false }),
   ];
 
   it('ポータル台帳にパスとロールを載せる', () => {
     expect(toPortalApps(apps)).toMatchObject([
       { id: 'bm-equipment', path: '/bm/equipment/', access: ['authenticated'] },
-      { id: 'bm-admin', path: '/bm/admin/', access: ['general-affairs'], status: 'preparing' },
+      { id: 'bm-admin', path: '/bm/admin/', access: ['general_affairs'], status: 'preparing' },
     ]);
   });
 
@@ -83,7 +84,7 @@ describe('toPortalApps / toSwaConfig', () => {
     const { routes, responseOverrides } = toSwaConfig(apps);
     const paths = routes.map((r) => r.route);
     expect(paths.indexOf('/bm/admin/*')).toBeLessThan(paths.indexOf('/*'));
-    expect(routes.find((r) => r.route === '/bm/admin/*').allowedRoles).toEqual(['general-affairs']);
+    expect(routes.find((r) => r.route === '/bm/admin/*').allowedRoles).toEqual(['general_affairs']);
     expect(routes.at(-1)).toEqual({ route: '/*', allowedRoles: ['authenticated'] });
     expect(responseOverrides[401].redirect).toMatch(/^\/\.auth\/login\/aad/);
   });
@@ -111,11 +112,11 @@ describe('申請内容（request）と管理画面', () => {
     expect(toAdminApps([entry()])[0].request).toBeNull();
   });
 
-  it('管理画面とそのプログラムは portal-admin だけ。ログイン必須の全体ルールより前に置く', () => {
+  it('管理画面とそのプログラムは portal_admin だけ。ログイン必須の全体ルールより前に置く', () => {
     const { routes } = toSwaConfig([entry()]);
     const paths = routes.map((r) => r.route);
-    expect(routes.find((r) => r.route === '/admin*').allowedRoles).toEqual(['portal-admin']);
-    expect(routes.find((r) => r.route === '/assets/admin-*').allowedRoles).toEqual(['portal-admin']);
+    expect(routes.find((r) => r.route === '/admin*').allowedRoles).toEqual(['portal_admin']);
+    expect(routes.find((r) => r.route === '/assets/admin-*').allowedRoles).toEqual(['portal_admin']);
     expect(paths.indexOf('/admin*')).toBeLessThan(paths.indexOf('/*'));
   });
 });

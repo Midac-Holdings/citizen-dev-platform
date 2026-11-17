@@ -1,0 +1,4 @@
+{
+  "$comment": "管理者（AI担当）が承認した、アプリごとの例外。キーは <部署コード>-<アプリ名>。値は tools/capabilities.mjs の CAPABILITIES の名前。市民の PR では変更できない（④変更範囲チェック）。",
+  "cp-tasukuri": ["microsoft-graph-mail", "platform-api"]
+}

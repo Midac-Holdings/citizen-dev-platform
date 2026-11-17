@@ -1,0 +1,18 @@
+{
+  "name": "タスクリ",
+  "description": "受信メールからAIが今日やるべきタスクを見つけて一覧にします（デモ：Microsoft 365 のメールを読み取り）。",
+  "category": "サポート",
+  "icon": "📋",
+  "color": "#5b5bd6",
+  "owner": "AI担当",
+  "status": "available",
+  "access": [
+    "authenticated"
+  ],
+  "request": {
+    "summary": "OutlookメールをAIが読んで、あなたにとって必要なタスクを自動でリストアップします。",
+    "access": "全社員",
+    "currentWork": "タスクの忘れ防止",
+    "hoursPerMonth": 10
+  }
+}

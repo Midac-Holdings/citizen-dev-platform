@@ -1,0 +1,12 @@
+{
+  "name": "citizen-dev-platform-api",
+  "private": true,
+  "version": "0.1.0",
+  "description": "市民開発基盤APPの API（Azure Static Web Apps のマネージド関数）。管理者（AI担当）が管理する。",
+  "type": "module",
+  "main": "src/functions/*.js",
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "@azure/functions": "^4.17.1"
+  }
+}

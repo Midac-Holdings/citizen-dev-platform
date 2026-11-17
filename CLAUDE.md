@@ -9,7 +9,8 @@
 2. `npm install` を1回実行する（新しいアプリをワークスペースに登録するため。`package-lock.json` も一緒にコミットする）。
 3. `apps/<部署コード>/<アプリ名>/app.manifest.json` を書く：
    - `name` / `description` / `category` / `owner`（部署名。個人名は書かない）
-   - `access`：利用できるロール。全社員なら `["authenticated"]`。特定の人に限る場合は AI担当に相談する。
+   - `access`：利用できるロール。全社員なら `["authenticated"]`。特定の人に限る場合は AI担当に相談する
+     （ロール名は半角英小文字・数字・アンダースコアのみ。例：`bm_members`）。
    - `request`：申請内容（管理画面の一覧・CSV に使われる）。`name` を ①アプリ名にし、
      `summary`（②機能概要）、`access`（③利用可能ユーザーの文章）、`currentWork`（④削減される既存業務）、
      `hoursPerMonth`（⑤削減が期待される時間・数値）を、依頼者から聞いた内容のまま書く。PR の「申請内容」欄と一致させる。

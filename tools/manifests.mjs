@@ -2,10 +2,13 @@
 // ポータル台帳・Azure Static Web Apps 設定の生成。
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { capabilitiesFor } from './capabilities.mjs';
 
 export const CATEGORIES = ['申請・手続き', '施設・設備', 'お知らせ・情報', 'サポート', '管理'];
 export const STATUSES = ['available', 'preparing'];
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// Azure Static Web Apps のロール名に使える文字（ハイフンは使えない）
+const ROLE = /^[a-z0-9_]+$/;
 const RESERVED_DEPTS = new Set(['portal', 'assets', 'api', 'auth']);
 // Azure Static Web Apps の組み込みロール。anonymous を許すとログイン不要になるため禁止。
 const BUILTIN_ROLES = new Set(['authenticated']);
@@ -57,8 +60,8 @@ export function validateApp({ dept, app, manifest, parseError, hasPackage }) {
     errors.push(`${where}: "access" に利用できるロールを1つ以上指定してください（全社員は "authenticated"）`);
   } else {
     for (const role of m.access) {
-      if (typeof role !== 'string' || !(BUILTIN_ROLES.has(role) || SLUG.test(role)) || role === 'anonymous') {
-        errors.push(`${where}: "access" のロール "${role}" は使えません`);
+      if (typeof role !== 'string' || !(BUILTIN_ROLES.has(role) || ROLE.test(role)) || role === 'anonymous') {
+        errors.push(`${where}: "access" のロール "${role}" は使えません（半角英小文字・数字・アンダースコアのみ。例：bm_members）`);
       }
     }
   }
@@ -121,28 +124,45 @@ export function toPortalApps(apps) {
   }));
 }
 
-export const CSP = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "form-action 'self'",
-  "base-uri 'self'",
-  "object-src 'none'",
-  "frame-ancestors 'none'",
-].join('; ');
+/** CSP を組み立てる。connect / frame は、許可されたアプリだけ追加される。 */
+export function buildCsp({ connectSrc = [], frameSrc = [], frameAncestors = "'none'" } = {}) {
+  return [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data:",
+    "font-src 'self' data:",
+    ['connect-src', "'self'", ...connectSrc].join(' '),
+    ['frame-src', ...(frameSrc.length ? frameSrc : ["'none'"])].join(' '),
+    "form-action 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    `frame-ancestors ${frameAncestors}`,
+  ].join('; ');
+}
+
+export const CSP = buildCsp();
 
 /** ポータルの管理画面（/admin/）を開けるロール */
-export const ADMIN_ROLE = 'portal-admin';
+export const ADMIN_ROLE = 'portal_admin';
 
 /** Azure Static Web Apps の設定。パスごとに利用できるロールを指定する。 */
-export function toSwaConfig(apps) {
-  const appRoutes = apps.map(({ dept, app, manifest }) => ({
-    route: `/${dept}/${app}/*`,
-    allowedRoles: [...manifest.access],
-  }));
+export function toSwaConfig(apps, appCapabilities = {}) {
+  const appRoutes = [];
+  for (const { dept, app, manifest } of apps) {
+    const id = `${dept}-${app}`;
+    const caps = capabilitiesFor(id, appCapabilities);
+    const route = { route: `/${dept}/${app}/*`, allowedRoles: [...manifest.access] };
+    if (caps.connectSrc.length || caps.frameSrc.length) {
+      // 許可されたアプリだけ、通信先を追加した CSP に差し替える（サインイン用に同じサイト内の埋め込みも許可）
+      route.headers = {
+        'Content-Security-Policy': buildCsp({ connectSrc: caps.connectSrc, frameSrc: caps.frameSrc, frameAncestors: "'self'" }),
+        'X-Frame-Options': 'SAMEORIGIN',
+      };
+    }
+    appRoutes.push(route);
+    if (caps.api) appRoutes.push({ route: `/api/${id}/*`, allowedRoles: [...manifest.access] });
+  }
   return {
     routes: [
       // ログインは Microsoft（Entra ID）のみ
@@ -160,6 +180,7 @@ export function toSwaConfig(apps) {
       403: { rewrite: '/403.html', statusCode: 403 },
       404: { rewrite: '/404.html', statusCode: 404 },
     },
+    platform: { apiRuntime: 'node:22' },
     globalHeaders: {
       // ⑥ ブラウザでの送信制限：自社サイト以外からの読み込み・自社サイト以外への送信を禁止する
       'Content-Security-Policy': CSP,

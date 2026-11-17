@@ -21,6 +21,9 @@ const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '
 const server = createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   for (const [k, v] of Object.entries(config.globalHeaders ?? {})) res.setHeader(k, v);
+  // 本番と同じく、ルートごとのヘッダー（許可されたアプリの CSP など）で上書きする
+  const route = (config.routes ?? []).find((r) => r.headers && url.pathname.startsWith(r.route.replace(/\*$/, '')));
+  for (const [k, v] of Object.entries(route?.headers ?? {})) res.setHeader(k, v);
   if (url.pathname === '/.auth/me') {
     // ログイン済み（全ロール付き）として振る舞う
     res.setHeader('Content-Type', 'application/json');

@@ -7,8 +7,8 @@ const viewer = (roles: string[]): Viewer => ({ id: 'x', displayName: 'x', roles,
 
 describe('roleBasedPolicy', () => {
   it('ロールが一致するアプリだけ表示する', () => {
-    expect(roleBasedPolicy.canView(viewer(['authenticated']), { access: ['general-affairs'] })).toBe(false);
-    expect(roleBasedPolicy.canView(viewer(['authenticated', 'general-affairs']), { access: ['general-affairs'] })).toBe(true);
+    expect(roleBasedPolicy.canView(viewer(['authenticated']), { access: ['general_affairs'] })).toBe(false);
+    expect(roleBasedPolicy.canView(viewer(['authenticated', 'general_affairs']), { access: ['general_affairs'] })).toBe(true);
   });
 
   it('ロールがなければ何も表示しない', () => {

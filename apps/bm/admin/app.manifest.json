@@ -6,5 +6,5 @@
   "color": "#06a77d",
   "owner": "総務G",
   "status": "preparing",
-  "access": ["general-affairs"]
+  "access": ["general_affairs"]
 }
