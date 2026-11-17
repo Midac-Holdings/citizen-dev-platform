@@ -7,6 +7,8 @@ import { capabilitiesFor } from './capabilities.mjs';
 export const CATEGORIES = ['申請・手続き', '施設・設備', 'お知らせ・情報', 'サポート', '管理'];
 export const STATUSES = ['available', 'preparing'];
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// Azure Static Web Apps のロール名に使える文字（ハイフンは使えない）
+const ROLE = /^[a-z0-9_]+$/;
 const RESERVED_DEPTS = new Set(['portal', 'assets', 'api', 'auth']);
 // Azure Static Web Apps の組み込みロール。anonymous を許すとログイン不要になるため禁止。
 const BUILTIN_ROLES = new Set(['authenticated']);
@@ -58,8 +60,8 @@ export function validateApp({ dept, app, manifest, parseError, hasPackage }) {
     errors.push(`${where}: "access" に利用できるロールを1つ以上指定してください（全社員は "authenticated"）`);
   } else {
     for (const role of m.access) {
-      if (typeof role !== 'string' || !(BUILTIN_ROLES.has(role) || SLUG.test(role)) || role === 'anonymous') {
-        errors.push(`${where}: "access" のロール "${role}" は使えません`);
+      if (typeof role !== 'string' || !(BUILTIN_ROLES.has(role) || ROLE.test(role)) || role === 'anonymous') {
+        errors.push(`${where}: "access" のロール "${role}" は使えません（半角英小文字・数字・アンダースコアのみ。例：bm_members）`);
       }
     }
   }
@@ -142,7 +144,7 @@ export function buildCsp({ connectSrc = [], frameSrc = [], frameAncestors = "'no
 export const CSP = buildCsp();
 
 /** ポータルの管理画面（/admin/）を開けるロール */
-export const ADMIN_ROLE = 'portal-admin';
+export const ADMIN_ROLE = 'portal_admin';
 
 /** Azure Static Web Apps の設定。パスごとに利用できるロールを指定する。 */
 export function toSwaConfig(apps, appCapabilities = {}) {

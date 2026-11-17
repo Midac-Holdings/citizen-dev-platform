@@ -7,11 +7,11 @@ const respond = (body: unknown, ok = true) =>
 describe('loadViewerFromSwa', () => {
   it('/.auth/me のロールを利用者に変換する（anonymous は除く）', async () => {
     const state = await loadViewerFromSwa(
-      respond({ clientPrincipal: { userId: 'u1', userDetails: 'taro@example.com', userRoles: ['anonymous', 'authenticated', 'general-affairs'] } }),
+      respond({ clientPrincipal: { userId: 'u1', userDetails: 'taro@example.com', userRoles: ['anonymous', 'authenticated', 'general_affairs'] } }),
     );
     expect(state).toEqual({
       mode: 'swa',
-      viewer: { id: 'u1', displayName: 'taro@example.com', roles: ['authenticated', 'general-affairs'], source: 'swa' },
+      viewer: { id: 'u1', displayName: 'taro@example.com', roles: ['authenticated', 'general_affairs'], source: 'swa' },
     });
   });
 

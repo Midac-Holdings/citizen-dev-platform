@@ -72,7 +72,7 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 |---|---|
 | `category` | 申請・手続き／施設・設備／お知らせ・情報／サポート／管理 |
 | `status` | `available`（公開）／`preparing`（準備中：カードは出るが開けない） |
-| `access` | 利用できるロール。`authenticated` は全社員（ログインした人全員）。`general-affairs` などの独自ロールは特定の人だけ |
+| `access` | 利用できるロール。`authenticated` は全社員（ログインした人全員）。`general_affairs` などの独自ロールは特定の人だけ（ロール名は半角英小文字・数字・アンダースコアのみ。ハイフンは使えない） |
 
 この申告から次の2つを**自動生成**します（手で書かないので食い違いません）。
 - ポータルのカード一覧（誰にどのカードを見せるか）
@@ -84,8 +84,8 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 ④削減される既存業務 ⑤削減が期待される時間）を一覧でき、**CSV（Excel でそのまま開ける形式）でダウンロード**できます。
 申請内容は各アプリの `app.manifest.json` の `request` 欄から自動で集めます。
 
-- 開けるのはロール **`portal-admin`** を持つ人だけです（画面のプログラムも管理者だけに配信）。
-  デモ構成では、Azure Portal の静的 Web アプリ →「ロール管理」→「招待」で `portal-admin` を付けます。
+- 開けるのはロール **`portal_admin`** を持つ人だけです（画面のプログラムも管理者だけに配信）。
+  デモ構成では、Azure Portal の静的 Web アプリ →「ロール管理」→「招待」で `portal_admin` を付けます。
 - ポータルのトップには、管理者にだけ「管理画面」のリンクが表示されます。
 - 申請中（PR が未マージ）のアプリは含みません。
 
@@ -129,7 +129,7 @@ npm run build                        # dist/ に1つのサイトとしてまと�
 3. GitHub のこのリポジトリ →「Settings → Secrets and variables → Actions → New repository secret」
    - 名前：`AZURE_STATIC_WEB_APPS_API_TOKEN`、値：コピーしたトークン
 4. （総務管理カードの確認用）Static Web Apps の「**ロール管理**」→「招待」で、
-   確認用のユーザーにロール `general-affairs` を付ける
+   確認用のユーザーにロール `general_affairs` を付ける
 
 トークン未登録の間は、チェックだけ実行して公開はスキップされます。
 
@@ -188,7 +188,7 @@ PR 本文を編集すると自動で再確認されます。申告は自己申�
 
 ## 制限事項（デモ）
 - ログインは Static Web Apps 標準の Microsoft ログイン。**社外アカウントでもログイン可能**。
-- 独自ロール（`general-affairs` 等）は Static Web Apps の招待で個別に付ける。
+- 独自ロール（`general_affairs` 等）は Static Web Apps の招待で個別に付ける。
 - 備品申請のデータはブラウザ内（localStorage）にのみ保存され、総務には届きません。
 - Free プランのプレビュー環境は同時に3つまで。
 

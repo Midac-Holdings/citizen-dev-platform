@@ -26,13 +26,13 @@ describe('ログインした利用者（Azure Static Web Apps）', () => {
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
   });
 
-  it('general-affairs ロールがあれば総務管理カードを表示する', async () => {
-    render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'general-affairs'])} />);
+  it('general_affairs ロールがあれば総務管理カードを表示する', async () => {
+    render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'general_affairs'])} />);
     expect(await cardNames()).toContain('総務管理（準備中）');
   });
 
   it('公開中のアプリはサイト内のパスで開き、準備中は開けない', async () => {
-    render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'general-affairs'])} />);
+    render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'general_affairs'])} />);
     const card = await screen.findByRole('article', { name: '備品申請' });
     expect(within(card).getByRole('link', { name: /開く/ })).toHaveAttribute('href', '/bm/equipment/');
     const admin = screen.getByRole('article', { name: '総務管理（準備中）' });
@@ -86,8 +86,8 @@ describe('アプリを作る', () => {
 });
 
 describe('管理画面へのリンク', () => {
-  it('portal-admin ロールの人にだけ表示する', async () => {
-    const { unmount } = render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'portal-admin'])} />);
+  it('portal_admin ロールの人にだけ表示する', async () => {
+    const { unmount } = render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'portal_admin'])} />);
     expect(await screen.findByRole('link', { name: '管理画面' })).toHaveAttribute('href', '/admin/');
     unmount();
     render(<App apps={fixtureApps} loadViewer={swa(['authenticated'])} />);

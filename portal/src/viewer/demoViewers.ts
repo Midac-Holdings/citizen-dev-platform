@@ -6,7 +6,7 @@ export const demoViewers: readonly Viewer[] = [
   {
     id: 'demo-general-affairs',
     displayName: '総務担当',
-    roles: ['authenticated', 'general-affairs'],
+    roles: ['authenticated', 'general_affairs'],
     source: 'demo',
   },
 ];
