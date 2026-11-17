@@ -1,6 +1,7 @@
 name: 部内テストの申告
 
-# PR 本文の「部内テスト（必須）」欄を確認する。本文を編集すると再確認される。
+# PR 本文の「申請内容（必須）」欄（①〜⑤）と「部内テスト（必須）」欄を確認する。本文を編集すると再確認される。
+# ジョブ名「部内テストの申告」は、ルールセットの必須チェックに登録しているので変えない。
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened, ready_for_review, converted_to_draft]
@@ -18,7 +19,7 @@ jobs:
         with:
           # 判定に使うのは main 側の仕組み（PR 側で書き換えられないように）
           ref: ${{ github.event.pull_request.base.sha }}
-      - name: 部内テスト欄の記入を確認
+      - name: 申請内容（①〜⑤）と部内テスト欄の記入を確認
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
