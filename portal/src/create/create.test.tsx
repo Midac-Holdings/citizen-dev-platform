@@ -43,6 +43,7 @@ describe('申請内容（①〜⑤）', () => {
     expect(text).toContain('npm run new-app -- bm meeting-room');
     expect(text).toContain('下書き（Draft）PR');
     expect(text).toContain('## 申請内容（必須）');
+    expect(text).toContain('"request": {"summary":"空き状況を見て 予約・取消できる","access":"部署全員（BM部の全員）","currentWork":"Excel の予約表への手入力","hoursPerMonth":10}');
   });
 });
 

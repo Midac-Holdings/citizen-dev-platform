@@ -6,10 +6,12 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      // トップ（アプリ一覧）と「アプリを作る」の2ページ
+      // トップ（アプリ一覧）、「アプリを作る」、管理画面の3ページ
       input: {
         main: resolve(import.meta.dirname, 'index.html'),
         create: resolve(import.meta.dirname, 'create/index.html'),
+        // 管理画面（管理者ロールだけが開ける。プログラムも assets/admin-*.js として管理者だけに配信）
+        admin: resolve(import.meta.dirname, 'admin/index.html'),
       },
     },
   },

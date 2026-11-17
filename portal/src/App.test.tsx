@@ -84,3 +84,14 @@ describe('アプリを作る', () => {
     expect(await screen.findByRole('link', { name: '＋ アプリを作る' })).toHaveAttribute('href', '/create/');
   });
 });
+
+describe('管理画面へのリンク', () => {
+  it('portal-admin ロールの人にだけ表示する', async () => {
+    const { unmount } = render(<App apps={fixtureApps} loadViewer={swa(['authenticated', 'portal-admin'])} />);
+    expect(await screen.findByRole('link', { name: '管理画面' })).toHaveAttribute('href', '/admin/');
+    unmount();
+    render(<App apps={fixtureApps} loadViewer={swa(['authenticated'])} />);
+    await screen.findByRole('link', { name: '＋ アプリを作る' });
+    expect(screen.queryByRole('link', { name: '管理画面' })).not.toBeInTheDocument();
+  });
+});
