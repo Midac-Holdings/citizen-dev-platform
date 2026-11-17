@@ -3,12 +3,13 @@
  * 基盤の管理者が許可したアプリだけが使える例外（tools/app-capabilities.json の microsoft-graph-mail）。
  * メールはこのブラウザで読むだけで、どこにも保存しない。
  */
-import { InteractionRequiredAuthError, PublicClientApplication } from '@azure/msal-browser';
+import { InteractionRequiredAuthError, PublicClientApplication, type AuthenticationResult } from '@azure/msal-browser';
 import { ENTRA, GRAPH_SCOPES } from './config';
 
 const GRAPH = 'https://graph.microsoft.com/v1.0';
 
 let pca: PublicClientApplication | null = null;
+let redirectResult: Promise<AuthenticationResult | null> | null = null;
 
 async function getClient(): Promise<PublicClientApplication> {
   if (!pca) {
@@ -21,8 +22,27 @@ async function getClient(): Promise<PublicClientApplication> {
       cache: { cacheLocation: 'sessionStorage' },
     });
     await pca.initialize();
+    // サインインの戻りを必ず最初に処理する。前回のサインインが途中で終わっていても、ここで片付く
+    // （片付けないと次のサインインで interaction_in_progress になる）
+    redirectResult = pca.handleRedirectPromise();
+    await redirectResult.catch(() => null);
   }
   return pca;
+}
+
+/** サインインのエラーを、利用者に分かる日本語にする */
+export function authErrorMessage(e: unknown): string {
+  const code = (e as { errorCode?: string })?.errorCode ?? '';
+  const text = `${code} ${e instanceof Error ? e.message : String(e)}`;
+  if (/AADSTS50105/.test(text)) {
+    return 'タスクリ（メールの読み取り）の利用が許可されていません。利用したい場合は、AI担当に依頼してください';
+  }
+  if (/AADSTS65001|consent_required|AADSTS90094/.test(text)) {
+    return 'メールの読み取りの許可（同意）が必要です。組織の設定により、管理者の同意が必要な場合があります。AI担当に連絡してください';
+  }
+  if (/user_cancelled|access_denied/.test(text)) return 'サインインがキャンセルされました。もう一度お試しください';
+  if (/interaction_in_progress/.test(text)) return 'サインインの途中です。ページを再読み込みしてから、もう一度お試しください';
+  return `Microsoft 365 へのサインインでエラーが発生しました（${code || '詳細不明'}）`;
 }
 
 /** サインインから戻ってきたところか（URL にサインインの結果が付いている） */
@@ -33,10 +53,14 @@ export function isReturningFromSignIn(): boolean {
 
 /** サインインから戻ってきたときに呼ぶ。サインインできていれば true */
 export async function completeSignIn(): Promise<boolean> {
-  const client = await getClient();
-  const result = await client.handleRedirectPromise();
-  if (result?.account) client.setActiveAccount(result.account);
-  return Boolean(result?.account);
+  try {
+    const client = await getClient();
+    const result = await redirectResult;
+    if (result?.account) client.setActiveAccount(result.account);
+    return Boolean(result?.account);
+  } catch (e) {
+    throw new Error(authErrorMessage(e));
+  }
 }
 
 /**
@@ -44,18 +68,22 @@ export async function completeSignIn(): Promise<boolean> {
  * （戻ってきたら completeSignIn → もう一度この関数）。
  */
 export async function getGraphToken(): Promise<string | null> {
-  const client = await getClient();
-  const account = client.getActiveAccount() ?? client.getAllAccounts()[0];
-  if (account) {
-    try {
-      const r = await client.acquireTokenSilent({ scopes: GRAPH_SCOPES, account });
-      return r.accessToken;
-    } catch (e) {
-      if (!(e instanceof InteractionRequiredAuthError)) throw e;
+  try {
+    const client = await getClient();
+    const account = client.getActiveAccount() ?? client.getAllAccounts()[0];
+    if (account) {
+      try {
+        const r = await client.acquireTokenSilent({ scopes: GRAPH_SCOPES, account });
+        return r.accessToken;
+      } catch (e) {
+        if (!(e instanceof InteractionRequiredAuthError)) throw e;
+      }
     }
+    await client.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
+    return null;
+  } catch (e) {
+    throw new Error(authErrorMessage(e));
   }
-  await client.acquireTokenRedirect({ scopes: GRAPH_SCOPES });
-  return null;
 }
 
 export interface Me {

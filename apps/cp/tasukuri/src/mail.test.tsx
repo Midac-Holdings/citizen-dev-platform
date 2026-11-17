@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App, { type MailDeps } from './App';
 import { toTasks, type ApiTask } from './extract';
-import { cleanBody, positionOf, toMailForAi, type MailForAi } from './graph';
+import { authErrorMessage, cleanBody, positionOf, toMailForAi, type MailForAi } from './graph';
 import { loadMailExtraction } from './tasks';
 
 const TODAY = new Date(2026, 10, 16, 9, 0, 0);
@@ -40,6 +40,16 @@ const mailFor = (id: string): MailForAi => ({
 const apiTask = (mailId: string, title: string, extra: Partial<ApiTask> = {}): ApiTask => ({
   mailId, title, detail: '詳細', actionType: '返信', dueDate: '2026-11-16', priority: '高',
   recipientRole: 'To（自分だけ）', interpretation: '自分への個別依頼', reason: '期限付きの依頼', ...extra,
+});
+
+describe('サインインのエラー表示', () => {
+  it('割り当てがない・同意が必要・キャンセル・途中のままを、日本語で案内する', () => {
+    expect(authErrorMessage(Object.assign(new Error('AADSTS50105: The signed in user is not assigned to a role'), { errorCode: 'invalid_grant' }))).toContain('利用が許可されていません');
+    expect(authErrorMessage(Object.assign(new Error('x'), { errorCode: 'consent_required' }))).toContain('同意');
+    expect(authErrorMessage(Object.assign(new Error('x'), { errorCode: 'user_cancelled' }))).toContain('キャンセル');
+    expect(authErrorMessage(Object.assign(new Error('x'), { errorCode: 'interaction_in_progress' }))).toContain('再読み込み');
+    expect(authErrorMessage(Object.assign(new Error('x'), { errorCode: 'server_error' }))).toContain('server_error');
+  });
 });
 
 describe('API の結果 → 画面のタスク', () => {
