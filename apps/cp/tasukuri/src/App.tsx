@@ -35,7 +35,7 @@ const defaultMailDeps: MailDeps = {
   extract: extractFromMail,
 };
 
-const PENDING_KEY = 'ai-taskuri.pendingDays';
+const PENDING_KEY = 'cp-tasukuri.pendingDays';
 const DAY_OPTIONS = [7, 14, 30] as const;
 
 interface Props {

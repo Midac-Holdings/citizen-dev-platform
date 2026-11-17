@@ -3,7 +3,7 @@
 受信メールからAIが見つけた「今日やるべきタスク」を一覧にするアプリです。
 
 - **実際のメールから抽出**：Microsoft 365 にサインインし、受信トレイのメール（過去7／14／30日、最大100通）を
-  Microsoft Graph で読み、5通ずつ基盤の API（`/api/ai-taskuri/extract`）に送ります。API が社内の Azure OpenAI で
+  Microsoft Graph で読み、5通ずつ基盤の API（`/api/cp-tasukuri/extract`）に送ります。API が社内の Azure OpenAI で
   タスクを抽出して返します。メール本文は保存しません。結果と完了の操作は、このブラウザ内にだけ保存します。
 - **サンプル**：抽出する前、または「サンプルに戻す」を押したときは、サンプルデータを表示します。
 - タブ：今日やる（期限が今日以前＋期限なしの優先度高・中）／未着手／完了済み
@@ -12,8 +12,8 @@
 ## しくみ
 | 部分 | 場所 | 管理者 |
 |---|---|---|
-| 画面・サインイン（MSAL）・メールの取得（Graph） | `apps/ai/taskuri/src/`（`graph.ts`、`extract.ts`） | アプリの作成者 |
-| サインインの設定（テナントID・クライアントID） | `apps/ai/taskuri/src/config.ts` | 管理者が Entra でアプリを登録して記入 |
+| 画面・サインイン（MSAL）・メールの取得（Graph） | `apps/cp/tasukuri/src/`（`graph.ts`、`extract.ts`） | アプリの作成者 |
+| サインインの設定（テナントID・クライアントID） | `apps/cp/tasukuri/src/config.ts` | 管理者が Entra でアプリを登録して記入 |
 | AI での抽出（Azure OpenAI の呼び出し） | `api/src/lib/taskuri.js`、`api/src/functions/taskuri-extract.js` | 基盤の管理者 |
 | 外部との通信・API の利用の許可 | `tools/app-capabilities.json`（`microsoft-graph-mail`、`platform-api`） | 基盤の管理者 |
 

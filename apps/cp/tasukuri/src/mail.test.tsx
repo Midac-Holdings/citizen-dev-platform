@@ -95,11 +95,11 @@ describe('画面：実際のメールから抽出', () => {
     render(<App today={TODAY} mail={d} />);
     await user.click(screen.getByRole('button', { name: 'メールを読み込んで抽出する' }));
     expect(loadMailExtraction()).toBeNull();
-    expect(sessionStorage.getItem('ai-taskuri.pendingDays')).toBe('30');
+    expect(sessionStorage.getItem('cp-tasukuri.pendingDays')).toBe('30');
   });
 
   it('サインインから戻ってきたら、続きを自動で実行する', async () => {
-    sessionStorage.setItem('ai-taskuri.pendingDays', '14');
+    sessionStorage.setItem('cp-tasukuri.pendingDays', '14');
     const d = deps({ returning: () => true });
     render(<App today={TODAY} mail={d} />);
     expect(await screen.findByRole('article', { name: '見積を回答する' })).toBeInTheDocument();

@@ -219,8 +219,8 @@ export function filterTasks(tasks: Task[], view: View, today: Date): Task[] {
 
 // ---------------------------------------------------------------- 保存（このブラウザ内のみ）
 
-const STATUS_KEY = 'ai-taskuri.status';
-const SETTINGS_KEY = 'ai-taskuri.settings';
+const STATUS_KEY = 'cp-tasukuri.status';
+const SETTINGS_KEY = 'cp-tasukuri.settings';
 
 type StatusMap = Record<string, Status>;
 
@@ -241,7 +241,7 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-const MAIL_TASKS_KEY = 'ai-taskuri.mailTasks';
+const MAIL_TASKS_KEY = 'cp-tasukuri.mailTasks';
 
 /** 実メールから抽出した結果（このブラウザ内に保存） */
 export interface MailExtraction {

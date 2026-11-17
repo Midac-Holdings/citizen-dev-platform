@@ -2,7 +2,7 @@
  * 実際のメールからタスクを作る流れ：
  *   1. Microsoft 365 にサインイン（必要なときだけ Microsoft の画面へ移動）
  *   2. 受信メールを Microsoft Graph で取得（このブラウザ内）
- *   3. 5通ずつ基盤の API（/api/ai-taskuri/extract → 社内の Azure OpenAI）に送って、タスクを受け取る
+ *   3. 5通ずつ基盤の API（/api/cp-tasukuri/extract → 社内の Azure OpenAI）に送って、タスクを受け取る
  */
 import { MAILS_PER_REQUEST, MAX_MAILS } from './config';
 import { getGraphToken, getMe, listInboxMails, type MailForAi } from './graph';
@@ -58,7 +58,7 @@ export function toTasks(apiTasks: ApiTask[], mails: MailForAi[]): Task[] {
 }
 
 async function extractBatch(today: Date, me: { name: string; email: string }, mails: MailForAi[]): Promise<ApiTask[]> {
-  const res = await fetch('/api/ai-taskuri/extract', {
+  const res = await fetch('/api/cp-tasukuri/extract', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
