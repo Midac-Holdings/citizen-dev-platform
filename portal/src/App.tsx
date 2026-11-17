@@ -56,6 +56,9 @@ export default function App({ apps = portalApps, loadViewer }: Props) {
             <p className="signed-in">
               ログイン中：<strong>{state.viewer.displayName}</strong>
               <a className="signed-in__logout" href="/.auth/logout">ログアウト</a>
+              {state.viewer.roles.includes('portal-admin') && (
+                <a className="admin-link" href="/admin/">管理画面</a>
+              )}
             </p>
           )}
           <div className="hero__actions">

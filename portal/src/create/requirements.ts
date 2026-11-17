@@ -70,6 +70,16 @@ export function requirementsSection(r: Requirements): string {
   ].join('\n');
 }
 
+/** app.manifest.json の request 欄（②〜⑤） */
+export function manifestRequestJson(r: Requirements): string {
+  return JSON.stringify({
+    summary: r.summary.trim().replace(/\s*\n\s*/g, ' '),
+    access: accessText(r),
+    currentWork: r.currentWork.trim().replace(/\s*\n\s*/g, ' '),
+    hoursPerMonth: Number(r.hoursPerMonth),
+  });
+}
+
 /** Claude Code に貼る依頼文 */
 export function buildRequest(r: Requirements): string {
   return [
@@ -80,7 +90,9 @@ export function buildRequest(r: Requirements): string {
     '進め方：',
     `1. npm run new-app -- ${r.dept} ${r.slug} でテンプレートから作る`,
     '2. ② の機能を実装し、テストを書く。npm test と npm run build が通ることを確認する',
-    `3. app.manifest.json を書く（利用可能ユーザーが「全社員」以外の場合、access は AI担当に相談が必要と私に伝える）`,
+    `3. app.manifest.json を書く。name は ① にし、申請内容を request に記録する（管理画面の一覧・CSV に使われる）：`,
+    `   "request": ${manifestRequestJson(r)}`,
+    `   利用可能ユーザーが「全社員」以外の場合、access は AI担当に相談が必要と私に伝える`,
     '4. PR テンプレートの欄をすべて残し、「申請内容（必須）」欄に上の内容をそのまま書いて、下書き（Draft）PR を出す',
     '5. PR の URL を教えてください（部内テストは私が行います）',
     '',

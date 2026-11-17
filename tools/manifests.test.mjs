@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { discoverApps, loadApps, toPortalApps, toSwaConfig, validateApp } from './manifests.mjs';
+import { discoverApps, loadApps, toAdminApps, toPortalApps, toSwaConfig, validateApp } from './manifests.mjs';
 
 const good = {
   name: '備品申請',
@@ -91,5 +91,31 @@ describe('toPortalApps / toSwaConfig', () => {
   it('ログインは Microsoft のみ（GitHub等は無効）', () => {
     const { routes } = toSwaConfig(apps);
     expect(routes).toContainEqual({ route: '/.auth/login/github', statusCode: 404 });
+  });
+});
+
+describe('申請内容（request）と管理画面', () => {
+  const request = { summary: '予約・取消ができる', access: '全社員', currentWork: 'Excel への手入力', hoursPerMonth: 10 };
+
+  it('request は任意。書く場合は ②〜⑤ がそろっていて、⑤ は 0 より大きい数', () => {
+    expect(validateApp(entry({ request }))).toEqual([]);
+    expect(validateApp(entry({ request: { ...request, hoursPerMonth: 0 } })).join()).toContain('hoursPerMonth');
+    expect(validateApp(entry({ request: { ...request, currentWork: '' } })).join()).toContain('currentWork');
+    expect(validateApp(entry({ request: 'x' })).join()).toContain('オブジェクト');
+  });
+
+  it('管理画面用の台帳には申請内容・フォルダ・担当部署が入り、ポータル用には入らない', () => {
+    const apps = [entry({ request })];
+    expect(toAdminApps(apps)[0]).toMatchObject({ id: 'bm-equipment', folder: 'apps/bm/equipment/', owner: '総務G', request });
+    expect(toPortalApps(apps)[0].request).toBeUndefined();
+    expect(toAdminApps([entry()])[0].request).toBeNull();
+  });
+
+  it('管理画面とそのプログラムは portal-admin だけ。ログイン必須の全体ルールより前に置く', () => {
+    const { routes } = toSwaConfig([entry()]);
+    const paths = routes.map((r) => r.route);
+    expect(routes.find((r) => r.route === '/admin*').allowedRoles).toEqual(['portal-admin']);
+    expect(routes.find((r) => r.route === '/assets/admin-*').allowedRoles).toEqual(['portal-admin']);
+    expect(paths.indexOf('/admin*')).toBeLessThan(paths.indexOf('/*'));
   });
 });
