@@ -39,7 +39,7 @@ const server = createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
-const targets = [{ name: 'ポータル', path: '/' }, ...apps.filter((a) => a.status === 'available').map((a) => ({ name: a.name, path: a.path }))];
+const targets = [{ name: 'ポータル', path: '/' }, { name: 'アプリを作る', path: '/create/' }, ...apps.filter((a) => a.status === 'available').map((a) => ({ name: a.name, path: a.path }))];
 const browser = await chromium.launch(process.env.SMOKE_CHROMIUM_PATH ? { executablePath: process.env.SMOKE_CHROMIUM_PATH } : {});
 let failed = 0;
 

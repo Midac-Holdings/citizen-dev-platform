@@ -58,6 +58,9 @@ export default function App({ apps = portalApps, loadViewer }: Props) {
               <a className="signed-in__logout" href="/.auth/logout">ログアウト</a>
             </p>
           )}
+          <div className="hero__actions">
+            <a className="create-button" href="/create/">＋ アプリを作る</a>
+          </div>
         </div>
       </header>
 

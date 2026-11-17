@@ -77,3 +77,10 @@ describe('ローカル開発（デモ利用者）', () => {
     expect(await cardNames()).toEqual(['会議室予約']);
   });
 });
+
+describe('アプリを作る', () => {
+  it('トップに「＋ アプリを作る」ボタンがある', async () => {
+    render(<App apps={fixtureApps} loadViewer={swa(['authenticated'])} />);
+    expect(await screen.findByRole('link', { name: '＋ アプリを作る' })).toHaveAttribute('href', '/create/');
+  });
+});

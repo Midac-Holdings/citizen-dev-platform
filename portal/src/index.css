@@ -142,3 +142,47 @@ button, input { font: inherit; }
 .signed-in { margin: 0; font-size: 0.95rem; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
 .signed-in__logout { color: #fff; font-size: 0.85rem; }
 .badge--path { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; }
+
+/* トップの「アプリを作る」ボタン */
+.hero__actions { margin-top: 16px; }
+.create-button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 12px 20px; border-radius: 999px; background: #fff; color: var(--green-900);
+  font-weight: 800; text-decoration: none; box-shadow: 0 6px 16px rgba(13, 79, 43, 0.18);
+}
+.create-button:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+
+/* 「アプリを作る」ページ */
+.hero__back { color: #fff; font-size: 0.9rem; }
+.main.create { display: grid; gap: 16px; }
+.create-card {
+  background: var(--card); border-radius: var(--radius); padding: 20px;
+  box-shadow: 0 8px 24px rgba(13, 79, 43, 0.08); display: grid; gap: 10px;
+}
+.create-card h2 { margin: 0 0 4px; font-size: 1.1rem; }
+.create-card label { display: grid; gap: 4px; font-weight: 700; font-size: 0.92rem; }
+.create-card input, .create-card textarea {
+  font: inherit; padding: 10px 12px; border: 2px solid var(--line); border-radius: 10px; min-width: 0; background: #fff;
+}
+.create-card input:focus, .create-card textarea:focus { outline: none; border-color: var(--green-500); }
+.create-card fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; }
+.create-card legend { font-weight: 700; font-size: 0.92rem; margin-bottom: 4px; }
+.radios { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.create-card .radio { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.two { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.field-error { margin: -4px 0 0; color: #c0392b; font-weight: 700; font-size: 0.88rem; }
+.hint { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.done { margin: 0; color: var(--green-700); font-weight: 700; }
+.primary, .button-link {
+  font: inherit; font-weight: 700; padding: 12px 18px; border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--green-700); color: #fff; text-decoration: none; text-align: center;
+}
+.button-link { background: var(--green-100); color: var(--green-900); }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.request { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85rem; }
+.steps { margin: 0; padding-left: 1.4em; display: grid; gap: 8px; }
+.steps li { display: list-item; }
+.steps li strong { display: block; }
+.steps span { display: block; color: var(--muted); font-size: 0.9rem; }
+.links { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+.links a { color: var(--green-700); font-weight: 600; }
