@@ -10,6 +10,9 @@
 3. `apps/<部署コード>/<アプリ名>/app.manifest.json` を書く：
    - `name` / `description` / `category` / `owner`（部署名。個人名は書かない）
    - `access`：利用できるロール。全社員なら `["authenticated"]`。特定の人に限る場合は AI担当に相談する。
+   - `request`：申請内容（管理画面の一覧・CSV に使われる）。`name` を ①アプリ名にし、
+     `summary`（②機能概要）、`access`（③利用可能ユーザーの文章）、`currentWork`（④削減される既存業務）、
+     `hoursPerMonth`（⑤削減が期待される時間・数値）を、依頼者から聞いた内容のまま書く。PR の「申請内容」欄と一致させる。
 4. 画面は日本語。スマートフォンでも使えるようにする。
 5. テストを書き、`npm test` と `npm run build` が通ることを確認してから PR を出す。
 6. PR は**下書き（Draft）**で作る（`gh pr create --draft`）。本文は PR テンプレート（`.github/pull_request_template.md`）

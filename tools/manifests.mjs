@@ -63,7 +63,47 @@ export function validateApp({ dept, app, manifest, parseError, hasPackage }) {
     }
   }
   if (m.status === 'available' && !hasPackage) errors.push(`${where}: 公開（available）するアプリには package.json が必要です`);
+  if (m.request !== undefined) errors.push(...validateRequest(m.request, where));
   return errors;
+}
+
+/** 管理画面で CSV に出せる申請内容（①はアプリ名 name を使う）。古いアプリにはないことがある */
+export const REQUEST_FIELDS = {
+  summary: '② 機能概要',
+  access: '③ 利用可能ユーザー',
+  currentWork: '④ 削減される既存業務',
+  hoursPerMonth: '⑤ 削減が期待される時間（時間/月）',
+};
+
+function validateRequest(r, where) {
+  if (typeof r !== 'object' || r === null || Array.isArray(r)) return [`${where}: "request" はオブジェクトで書いてください`];
+  const errors = [];
+  for (const key of ['summary', 'access', 'currentWork']) {
+    if (typeof r[key] !== 'string' || r[key].trim() === '') errors.push(`${where}: "request.${key}"（${REQUEST_FIELDS[key]}）を入力してください`);
+  }
+  if (typeof r.hoursPerMonth !== 'number' || !(r.hoursPerMonth > 0)) {
+    errors.push(`${where}: "request.hoursPerMonth"（${REQUEST_FIELDS.hoursPerMonth}）は 0 より大きい数で入力してください`);
+  }
+  return errors;
+}
+
+/** 管理画面用の台帳（申請内容・利用できるロールを含む）。管理者だけが読める */
+export function toAdminApps(apps) {
+  return apps.map(({ dept, app, manifest: m }) => ({
+    id: `${dept}-${app}`,
+    dept,
+    path: `/${dept}/${app}/`,
+    folder: `apps/${dept}/${app}/`,
+    name: m.name,
+    description: m.description,
+    category: m.category,
+    owner: m.owner,
+    status: m.status,
+    access: [...m.access],
+    request: m.request
+      ? { summary: m.request.summary, access: m.request.access, currentWork: m.request.currentWork, hoursPerMonth: m.request.hoursPerMonth }
+      : null,
+  }));
 }
 
 export function toPortalApps(apps) {
@@ -94,6 +134,9 @@ export const CSP = [
   "frame-ancestors 'none'",
 ].join('; ');
 
+/** ポータルの管理画面（/admin/）を開けるロール */
+export const ADMIN_ROLE = 'portal-admin';
+
 /** Azure Static Web Apps の設定。パスごとに利用できるロールを指定する。 */
 export function toSwaConfig(apps) {
   const appRoutes = apps.map(({ dept, app, manifest }) => ({
@@ -106,6 +149,9 @@ export function toSwaConfig(apps) {
       { route: '/.auth/login/github', statusCode: 404 },
       { route: '/.auth/login/twitter', statusCode: 404 },
       ...appRoutes,
+      // 管理画面と、その画面のプログラム（申請内容の台帳を含む）：管理者だけ
+      { route: '/admin*', allowedRoles: [ADMIN_ROLE] },
+      { route: '/assets/admin-*', allowedRoles: [ADMIN_ROLE] },
       // ポータルを含むその他すべて：ログイン必須
       { route: '/*', allowedRoles: ['authenticated'] },
     ],
