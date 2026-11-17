@@ -102,6 +102,12 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 基盤の API（`api/`）は Azure Static Web Apps のマネージド関数（Node.js 22）として、サイトと一緒に公開されます。
 鍵などの設定値は、Azure Portal の静的 Web アプリ →「環境変数」に登録します（コードには書きません）。
 
+### 基盤の API の一覧
+| API | 利用するアプリ | 内容 |
+|---|---|---|
+| `POST /api/cp-tasukuri/extract` | タスクリ（`apps/cp/tasukuri`） | メールの内容から、Azure OpenAI でタスクを抽出 |
+| `GET /api/cp-wnw/news` | What'sNew ウォッチャー（`apps/cp/wnw`） | 会社HP（`https://www.midac.jp/news/`）の新着情報一覧を読み、新しい順に最大50件（`id`・`date`（YYYY-MM-DD）・`category`・`title`・`url`）を返す。読むだけで、読み先はこの URL に固定。10分間は結果を使い回す |
+
 | 環境変数 | 用途 |
 |---|---|
 | `AZURE_OPENAI_ENDPOINT` | タスクリ：Azure OpenAI のエンドポイント（`https://<リソース名>.openai.azure.com`。ターゲットURIを貼っても可） |
