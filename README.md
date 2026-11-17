@@ -107,6 +107,7 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 |---|---|---|
 | `POST /api/cp-tasukuri/extract` | タスクリ（`apps/cp/tasukuri`） | メールの内容から、Azure OpenAI でタスクを抽出 |
 | `GET /api/cp-wnw/news` | What'sNew ウォッチャー（`apps/cp/wnw`） | 会社HP（`https://www.midac.jp/news/`）の新着情報一覧を読み、新しい順に最大50件（`id`・`date`（YYYY-MM-DD）・`category`・`title`・`url`）を返す。読むだけで、読み先はこの URL に固定。10分間は結果を使い回す |
+| `GET / PUT / DELETE /api/cp-wnw/subscription` | What'sNew ウォッチャー（`apps/cp/wnw`） | 新着をメールで受け取る登録の確認・登録・解除。扱うのはログインした本人のアドレスだけ（会社のドメインのみ）。Azure Table Storage に保存する |
 
 | 環境変数 | 用途 |
 |---|---|
@@ -115,6 +116,24 @@ CLAUDE.md                      Claude Code が守るルール（認証を書か�
 | `AZURE_OPENAI_DEPLOYMENT` | タスクリ：モデルのデプロイ名 |
 | `AZURE_OPENAI_API_VERSION` | （任意）Responses API のバージョン。省略時は `2025-04-01-preview` |
 | `AZURE_OPENAI_REASONING_EFFORT` | （任意）推論モデルの考える深さ。省略時は `low`（関数の時間制限に収めるため） |
+| `WNW_TABLE_ENDPOINT` | What'sNew ウォッチャー：登録者を保存する Table Storage（`https://<ストレージアカウント名>.table.core.windows.net`） |
+| `WNW_TABLE_SAS` | What'sNew ウォッチャー：そのテーブルを読み書きできる SAS トークン |
+| `WNW_TABLE_NAME` | （任意）テーブル名。省略時は `WnwWatcher` |
+| `WNW_ALLOWED_DOMAINS` | （任意）登録できるメールアドレスのドメイン（カンマ区切り）。省略時は `midac.jp` |
+
+### What'sNew ウォッチャーのメール通知
+新着のメールは、30分おきに動くタイマー（`Midac-Holdings/-taskuri-functions` の `wnwTimer`）が送ります。
+Static Web Apps のマネージド関数はタイマーで動かせないため、タスクリの Function App に同居させています。
+
+```
+画面（/cp/wnw/）──登録・解除──▶ /api/cp-wnw/subscription ──▶ Table Storage（WnwWatcher）
+                                                                  ▲ 登録者・既読の記事を読む／書く
+Function App（wnwTimer、30分おき）── 会社HPを読む → 新しい記事があれば Graph で登録者にメール
+```
+
+設定の手順は `-taskuri-functions` の README「What'sNew ウォッチャーのメール通知」にまとめています。
+この静的 Web アプリでは、上の `WNW_TABLE_ENDPOINT` と `WNW_TABLE_SAS` を「環境変数」に登録します。
+未登録の間、画面には「メール通知はまだ準備中です」と表示されます（一覧はそのまま使えます）。
 
 ## コマンド
 

@@ -1,0 +1,18 @@
+{
+  "name": "What'sNew ウォッチャー",
+  "description": "会社HPの「新着情報」を一覧で確認できます。前回以降の新しい記事には NEW が付き、新着をメールで受け取ることもできます。",
+  "category": "お知らせ・情報",
+  "icon": "📰",
+  "color": "#0f6fb8",
+  "owner": "AI担当",
+  "status": "available",
+  "access": [
+    "authenticated"
+  ],
+  "request": {
+    "summary": "会社HP（https://www.midac.jp/news/）の新着情報一覧を表示し、新しい記事が載ったら登録した人にメールで知らせる。",
+    "access": "全社員",
+    "currentWork": "HPの更新情報を見逃さない",
+    "hoursPerMonth": 0.3
+  }
+}

@@ -47,13 +47,22 @@ for (const t of targets) {
   const page = await browser.newPage();
   const problems = [];
   page.on('pageerror', (e) => problems.push(`JavaScriptエラー: ${e.message}`));
-  page.on('console', (m) => m.type() === 'error' && problems.push(`コンソールエラー: ${m.text()}`));
+  page.on('console', (m) => {
+    if (m.type() !== 'error') return;
+    // 基盤の API（/api/...）は起動確認では動かない（下で 503 を返す）。その読み込み失敗は問題にしない
+    if (m.text().startsWith('Failed to load resource') && (m.location()?.url ?? '').startsWith(`${origin}/api/`)) return;
+    problems.push(`コンソールエラー: ${m.text()}`);
+  });
   page.on('request', (r) => {
     const u = r.url();
     if (!u.startsWith(origin) && !u.startsWith('data:')) problems.push(`外部への通信: ${u}`);
   });
   // 外部への通信は実際には送らない
   await page.route((u) => !u.href.startsWith(origin), (r) => r.abort());
+  // 基盤の API はここでは動かさない。アプリが「使えないとき」の表示で落ちないことを確かめる
+  await page.route((u) => u.href.startsWith(`${origin}/api/`), (r) =>
+    r.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: '起動確認では基盤の API を使えません' }) }),
+  );
 
   const res = await page.goto(origin + t.path, { waitUntil: 'networkidle' }).catch((e) => problems.push(`開けません: ${e.message}`));
   if (res && !res.ok()) problems.push(`HTTP ${res.status()}`);
