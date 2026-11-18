@@ -13,6 +13,7 @@ const filled: Requirements = {
   hoursPerMonth: '10',
   dept: 'bm',
   slug: 'meeting-room',
+  readFrom: '',
 };
 
 describe('申請内容（①〜⑤）', () => {
@@ -34,6 +35,7 @@ describe('申請内容（①〜⑤）', () => {
         '- ④ 削減される既存業務：Excel の予約表への手入力',
         '- ⑤ 削減が期待される時間（時間/月）：10',
         '- フォルダ：apps/bm/meeting-room/',
+        '- 読むサイト（任意。外部サイトを読む場合だけ）：',
       ].join('\n'),
     );
   });
@@ -44,6 +46,26 @@ describe('申請内容（①〜⑤）', () => {
     expect(text).toContain('下書き（Draft）PR');
     expect(text).toContain('## 申請内容（必須）');
     expect(text).toContain('"request": {"summary":"空き状況を見て 予約・取消できる","access":"部署全員（BM部の全員）","currentWork":"Excel の予約表への手入力","hoursPerMonth":10}');
+  });
+});
+
+describe('読むサイト（readFrom）', () => {
+  it('URL でもホスト名でも受け付け、ホスト名にそろえる', async () => {
+    const { parseReadFrom } = await import('./requirements');
+    expect(parseReadFrom('https://www.midac.jp/news/\nwww.mhlw.go.jp, https://www.midac.jp/')).toEqual({ hosts: ['www.midac.jp', 'www.mhlw.go.jp'], invalid: [] });
+    expect(parseReadFrom('10.0.0.1 intranet server.local').invalid).toHaveLength(3);
+  });
+
+  it('依頼文に readFrom の宣言と、読み取り API を使う指示が入る', () => {
+    const text = buildRequest({ ...filled, readFrom: 'https://www.midac.jp/news/' });
+    expect(text).toContain('"readFrom": ["www.midac.jp"]');
+    expect(text).toContain('/api/read/bm-meeting-room?url=');
+    expect(text).toContain('- 読むサイト（任意。外部サイトを読む場合だけ）：www.midac.jp');
+    expect(buildRequest(filled)).not.toContain('readFrom');
+  });
+
+  it('使えないサイトはエラー', () => {
+    expect(validate({ ...filled, readFrom: '192.168.0.1' }).readFrom).toContain('192.168.0.1');
   });
 });
 

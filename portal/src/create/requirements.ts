@@ -24,6 +24,8 @@ export interface Requirements {
   dept: string;
   /** アプリの英字名（URL に使う） */
   slug: string;
+  /** 読むサイト（任意）。URL かホスト名を、改行・空白・カンマ区切りで */
+  readFrom: string;
 }
 
 export const EMPTY: Requirements = {
@@ -35,9 +37,35 @@ export const EMPTY: Requirements = {
   hoursPerMonth: '',
   dept: '',
   slug: '',
+  readFrom: '',
 };
 
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+const HOSTNAME = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/** 読むサイトの入力（URL でもホスト名でも可）を、ホスト名の一覧にする。読めないものは invalid に入れる */
+export function parseReadFrom(input: string): { hosts: string[]; invalid: string[] } {
+  const hosts: string[] = [];
+  const invalid: string[] = [];
+  for (const raw of input.split(/[\s,、]+/).map((x) => x.trim()).filter(Boolean)) {
+    let host = raw.toLowerCase();
+    if (/^https?:\/\//.test(host)) {
+      try {
+        host = new URL(host).hostname;
+      } catch {
+        invalid.push(raw);
+        continue;
+      }
+    }
+    host = host.replace(/\/.*$/, '');
+    if (HOSTNAME.test(host) && !/\.(local|internal|localhost|lan|corp)$/.test(host)) {
+      if (!hosts.includes(host)) hosts.push(host);
+    } else {
+      invalid.push(raw);
+    }
+  }
+  return { hosts, invalid };
+}
 
 /** 入力チェック。項目ごとのエラー文を返す（空なら OK） */
 export function validate(r: Requirements): Partial<Record<keyof Requirements, string>> {
@@ -50,6 +78,9 @@ export function validate(r: Requirements): Partial<Record<keyof Requirements, st
   if (r.hoursPerMonth.trim() === '' || !Number.isFinite(h) || h <= 0) e.hoursPerMonth = '⑤ 削減が期待される時間を、0より大きい数で入力してください';
   if (!SLUG.test(r.dept)) e.dept = '部署コードは半角英小文字・数字・ハイフンで入力してください（例：bm）';
   if (!SLUG.test(r.slug)) e.slug = 'アプリの英字名は半角英小文字・数字・ハイフンで入力してください（例：meeting-room）';
+  const rf = parseReadFrom(r.readFrom);
+  if (rf.invalid.length) e.readFrom = `読むサイトに使えないものがあります：${rf.invalid.join('、')}（https の公開サイトの URL かホスト名）`;
+  else if (rf.hosts.length > 10) e.readFrom = '読むサイトは10件までです';
   return e;
 }
 
@@ -67,6 +98,7 @@ export function requirementsSection(r: Requirements): string {
     `- ④ 削減される既存業務：${r.currentWork.trim().replace(/\s*\n\s*/g, ' ')}`,
     `- ⑤ 削減が期待される時間（時間/月）：${Number(r.hoursPerMonth)}`,
     `- フォルダ：apps/${r.dept}/${r.slug}/`,
+    `- 読むサイト（任意。外部サイトを読む場合だけ）：${parseReadFrom(r.readFrom).hosts.join(' ')}`,
   ].join('\n');
 }
 
@@ -78,6 +110,15 @@ export function manifestRequestJson(r: Requirements): string {
     currentWork: r.currentWork.trim().replace(/\s*\n\s*/g, ' '),
     hoursPerMonth: Number(r.hoursPerMonth),
   });
+}
+
+function readFromSteps(r: Requirements): string[] {
+  const { hosts } = parseReadFrom(r.readFrom);
+  if (hosts.length === 0) return [];
+  return [
+    `   外部サイトを読むので、app.manifest.json に "readFrom": ${JSON.stringify(hosts)} も書く（申請不要・宣言制）。`,
+    `   読むときは CLAUDE.md の「外部サイトを読む」のとおり、基盤の読み取り API（/api/read/${r.dept}-${r.slug}?url=...）だけを使う`,
+  ];
 }
 
 /** Claude Code に貼る依頼文 */
@@ -93,6 +134,7 @@ export function buildRequest(r: Requirements): string {
     `3. app.manifest.json を書く。name は ① にし、申請内容を request に記録する（管理画面の一覧・CSV に使われる）：`,
     `   "request": ${manifestRequestJson(r)}`,
     `   利用可能ユーザーが「全社員」以外の場合、access は AI担当に相談が必要と私に伝える`,
+    ...readFromSteps(r),
     '4. PR テンプレートの欄をすべて残し、「申請内容（必須）」欄に上の内容をそのまま書いて、下書き（Draft）PR を出す',
     '5. PR の URL を教えてください（部内テストは私が行います）',
     '',

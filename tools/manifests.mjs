@@ -67,6 +67,7 @@ export function validateApp({ dept, app, manifest, parseError, hasPackage }) {
   }
   if (m.status === 'available' && !hasPackage) errors.push(`${where}: 公開（available）するアプリには package.json が必要です`);
   if (m.request !== undefined) errors.push(...validateRequest(m.request, where));
+  if (m.readFrom !== undefined) errors.push(...validateReadFrom(m.readFrom, where));
   return errors;
 }
 
@@ -90,6 +91,36 @@ function validateRequest(r, where) {
   return errors;
 }
 
+// 読むサイト（readFrom）に書けるホスト名。https の公開サイトのみ（IP アドレス・社内向けの名前は不可）
+const HOSTNAME = /^(?=.{4,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+const BLOCKED_HOST_SUFFIXES = ['.local', '.internal', '.localhost', '.lan', '.corp', '.home.arpa'];
+export const MAX_READ_FROM = 10;
+
+export function isAllowedReadHost(host) {
+  return typeof host === 'string' && HOSTNAME.test(host) && !BLOCKED_HOST_SUFFIXES.some((s) => host.endsWith(s));
+}
+
+function validateReadFrom(list, where) {
+  if (!Array.isArray(list)) return [`${where}: "readFrom" はホスト名の配列で書いてください（例：["www.midac.jp"]）`];
+  const errors = [];
+  if (list.length > MAX_READ_FROM) errors.push(`${where}: "readFrom" は ${MAX_READ_FROM} 件までです`);
+  for (const h of list) {
+    if (!isAllowedReadHost(h)) {
+      errors.push(`${where}: "readFrom" の "${h}" は使えません（https で公開されているサイトのホスト名だけ。例：www.midac.jp。URL・IP アドレス・社内向けの名前は不可）`);
+    }
+  }
+  return errors;
+}
+
+/** 読み取り API が使う「アプリごとの読んでよいサイト」 */
+export function toReadAllowlist(apps) {
+  const map = {};
+  for (const { dept, app, manifest } of apps) {
+    if (Array.isArray(manifest.readFrom) && manifest.readFrom.length) map[`${dept}-${app}`] = [...manifest.readFrom];
+  }
+  return map;
+}
+
 /** 管理画面用の台帳（申請内容・利用できるロールを含む）。管理者だけが読める */
 export function toAdminApps(apps) {
   return apps.map(({ dept, app, manifest: m }) => ({
@@ -103,6 +134,7 @@ export function toAdminApps(apps) {
     owner: m.owner,
     status: m.status,
     access: [...m.access],
+    readFrom: Array.isArray(m.readFrom) ? [...m.readFrom] : [],
     request: m.request
       ? { summary: m.request.summary, access: m.request.access, currentWork: m.request.currentWork, hoursPerMonth: m.request.hoursPerMonth }
       : null,
@@ -162,6 +194,10 @@ export function toSwaConfig(apps, appCapabilities = {}) {
     }
     appRoutes.push(route);
     if (caps.api) appRoutes.push({ route: `/api/${id}/*`, allowedRoles: [...manifest.access] });
+    // 外部サイトの読み取り（申請不要・宣言制）：そのアプリを使える人だけが呼べる
+    if (Array.isArray(manifest.readFrom) && manifest.readFrom.length) {
+      appRoutes.push({ route: `/api/read/${id}*`, allowedRoles: [...manifest.access] });
+    }
   }
   return {
     routes: [
