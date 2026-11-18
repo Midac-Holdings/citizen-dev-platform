@@ -4,7 +4,7 @@
   "category": "お知らせ・情報",
   "icon": "📰",
   "color": "#1f8a4c",
-  "owner": "（部署名）",
+  "owner": "CP",
   "status": "available",
   "access": [
     "authenticated"
