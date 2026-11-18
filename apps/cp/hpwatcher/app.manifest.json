@@ -1,0 +1,21 @@
+{
+  "name": "MidacHP 新着ウォッチャー",
+  "description": "当社HPの新着情報を一覧表示し、まだ見ていない記事に「新着」を付けます。既読はこのブラウザ内に保存します。",
+  "category": "お知らせ・情報",
+  "icon": "📰",
+  "color": "#1f8a4c",
+  "owner": "CP",
+  "status": "available",
+  "access": [
+    "authenticated"
+  ],
+  "request": {
+    "summary": "当社（㈱ミダックホールディングス）のHPの新着をすぐにみたい。新着のURLは以下。 https://www.midac.jp/news/ 新着が更新されるとメールが来る。",
+    "access": "全社員",
+    "currentWork": "新着情報をみのがさない",
+    "hoursPerMonth": 0.1
+  },
+  "readFrom": [
+    "www.midac.jp"
+  ]
+}
