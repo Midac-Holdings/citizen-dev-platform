@@ -1,9 +1,10 @@
-// ポータル用のアプリ台帳（portal/src/generated/apps.json）と、管理画面用の台帳（admin-apps.json）を生成する。
+// ポータル用のアプリ台帳（portal/src/generated/apps.json）、管理画面用の台帳（admin-apps.json）、
+// 読み取り API 用の「読んでよいサイト」（api/src/generated/read-from.json）を生成する。
 // --check: 検証のみ（ファイルは書かない）
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadApps, toAdminApps, toPortalApps } from './manifests.mjs';
+import { loadApps, toAdminApps, toPortalApps, toReadAllowlist } from './manifests.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -16,6 +17,10 @@ try {
     mkdirSync(dirname(out), { recursive: true });
     writeFileSync(out, JSON.stringify(toPortalApps(apps), null, 2) + '\n');
     writeFileSync(join(dirname(out), 'admin-apps.json'), JSON.stringify(toAdminApps(apps), null, 2) + '\n');
+    // 読み取り API（api/）が使う「アプリごとの読んでよいサイト」
+    const readOut = join(root, 'api/src/generated/read-from.json');
+    mkdirSync(dirname(readOut), { recursive: true });
+    writeFileSync(readOut, JSON.stringify(toReadAllowlist(apps), null, 2) + '\n');
     console.log(`ポータル台帳を生成しました（${apps.length}件）`);
   }
 } catch (e) {

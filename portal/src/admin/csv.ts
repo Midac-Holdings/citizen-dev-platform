@@ -11,6 +11,7 @@ export interface AdminApp {
   owner: string;
   status: 'available' | 'preparing';
   access: string[];
+  readFrom: string[];
   request: { summary: string; access: string; currentWork: string; hoursPerMonth: number } | null;
 }
 
@@ -30,6 +31,7 @@ const COLUMNS: [string, (a: AdminApp) => string | number][] = [
   ['カテゴリ', (a) => a.category],
   ['状態', (a) => STATUS_LABEL[a.status]],
   ['利用できるロール（設定値）', (a) => a.access.join(' ')],
+  ['読むサイト', (a) => (a.readFrom ?? []).join(' ')],
 ];
 
 function cell(v: string | number): string {

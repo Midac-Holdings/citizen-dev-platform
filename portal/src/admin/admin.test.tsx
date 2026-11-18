@@ -6,7 +6,7 @@ import { csvFileName, toCsv, totalHours, type AdminApp } from './csv';
 
 const app = (over: Partial<AdminApp> = {}): AdminApp => ({
   id: 'cp-tasukuri', dept: 'cp', path: '/cp/tasukuri/', folder: 'apps/cp/tasukuri/', name: 'タスクリ',
-  description: '', category: 'サポート', owner: 'AI担当', status: 'available', access: ['authenticated'],
+  description: '', category: 'サポート', owner: 'AI担当', status: 'available', access: ['authenticated'], readFrom: ['www.midac.jp'],
   request: { summary: 'OutlookメールをAIが読んで、タスクをリストアップ', access: '全社員', currentWork: 'タスクの忘れ防止', hoursPerMonth: 10 },
   ...over,
 });
@@ -16,8 +16,8 @@ describe('CSV', () => {
     const csv = toCsv([app()]);
     expect(csv.startsWith('﻿')).toBe(true);
     const [head, row] = csv.slice(1).split('\r\n');
-    expect(head).toBe('アプリID,① アプリ名,② 機能概要,③ 利用可能ユーザー,④ 削減される既存業務,⑤ 削減が期待される時間（時間/月）,フォルダ,URL,部署コード,担当部署,カテゴリ,状態,利用できるロール（設定値）');
-    expect(row).toBe('cp-tasukuri,タスクリ,OutlookメールをAIが読んで、タスクをリストアップ,全社員,タスクの忘れ防止,10,apps/cp/tasukuri/,/cp/tasukuri/,cp,AI担当,サポート,公開中,authenticated');
+    expect(head).toBe('アプリID,① アプリ名,② 機能概要,③ 利用可能ユーザー,④ 削減される既存業務,⑤ 削減が期待される時間（時間/月）,フォルダ,URL,部署コード,担当部署,カテゴリ,状態,利用できるロール（設定値）,読むサイト');
+    expect(row).toBe('cp-tasukuri,タスクリ,OutlookメールをAIが読んで、タスクをリストアップ,全社員,タスクの忘れ防止,10,apps/cp/tasukuri/,/cp/tasukuri/,cp,AI担当,サポート,公開中,authenticated,www.midac.jp');
   });
 
   it('カンマ・改行・引用符を含む値は囲み、式として実行されないようにする', () => {

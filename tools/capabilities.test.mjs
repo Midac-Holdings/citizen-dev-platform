@@ -39,3 +39,21 @@ describe('アプリごとの例外（ケイパビリティ）', () => {
     expect(scanSource("await fetch('https://graph.microsoft.com/v1.0/me')").map((f) => f.rule)).toEqual(['external-url', 'network']);
   });
 });
+
+describe('宣言制の読み取り（readFrom）', () => {
+  it('宣言したサイトの URL と、読み取り API の呼び出しは禁止パターンにならない。宣言外は検出する', async () => {
+    const { withReadFrom } = await import('./capabilities.mjs');
+    const allow = withReadFrom(capabilitiesFor('cp-wnw2', {}), ['www.midac.jp']);
+    expect(scanSource("await fetch('/api/read/cp-wnw2?url=' + encodeURIComponent('https://www.midac.jp/news/'))", allow)).toEqual([]);
+    expect(scanSource("fetch('https://evil.example.com/collect')", allow).map((f) => f.rule)).toEqual(['external-url']);
+    // 宣言がなければ従来どおり
+    expect(scanSource("fetch('/api/read/x')").map((f) => f.rule)).toEqual(['network']);
+  });
+
+  it('宣言したアプリだけ、読み取り API のルートができ、ブラウザの CSP は変わらない', () => {
+    const withRead = [{ dept: 'cp', app: 'wnw2', manifest: { ...manifest, readFrom: ['www.midac.jp'] } }];
+    const { routes } = toSwaConfig(withRead, {});
+    expect(routes.find((r) => r.route === '/api/read/cp-wnw2*').allowedRoles).toEqual(['authenticated']);
+    expect(routes.find((r) => r.route === '/cp/wnw2/*').headers).toBeUndefined();
+  });
+});

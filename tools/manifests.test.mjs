@@ -120,3 +120,15 @@ describe('申請内容（request）と管理画面', () => {
     expect(paths.indexOf('/admin*')).toBeLessThan(paths.indexOf('/*'));
   });
 });
+
+describe('読むサイト（readFrom）の宣言', () => {
+  it('公開サイトのホスト名だけ書ける', async () => {
+    const { toReadAllowlist } = await import('./manifests.mjs');
+    expect(validateApp(entry({ readFrom: ['www.midac.jp', 'www.mhlw.go.jp'] }))).toEqual([]);
+    for (const bad of ['https://www.midac.jp/news/', '10.0.0.1', 'localhost', 'server.local', 'WWW.MIDAC.JP', 'intranet']) {
+      expect(validateApp(entry({ readFrom: [bad] })).join()).toContain('readFrom');
+    }
+    expect(validateApp(entry({ readFrom: 'www.midac.jp' })).join()).toContain('配列');
+    expect(toReadAllowlist([entry({ readFrom: ['www.midac.jp'] }), entry({}, { app: 'admin' })])).toEqual({ 'bm-equipment': ['www.midac.jp'] });
+  });
+});

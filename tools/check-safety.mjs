@@ -3,7 +3,8 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { capabilitiesFor, loadAppCapabilities } from './capabilities.mjs';
+import { capabilitiesFor, loadAppCapabilities, withReadFrom } from './capabilities.mjs';
+import { discoverApps } from './manifests.mjs';
 
 export const RULES = [
   { id: 'external-url', re: /https?:\/\/(?!localhost[:/]|127\.0\.0\.1[:/])/i, message: '外部のURLが書かれています。外部サービスとの連携・外部ファイルの読み込みは AI担当に相談してください' },
@@ -61,11 +62,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
   const files = listFiles(join(root, 'apps'));
   const appCapabilities = loadAppCapabilities();
+  const readFrom = Object.fromEntries(discoverApps(join(root, 'apps')).map((a) => [`${a.dept}-${a.app}`, a.manifest?.readFrom ?? []]));
   let count = 0;
   for (const file of files) {
     const rel = relative(root, file);
     const m = rel.split(/[\\/]/);
-    const allow = m[1] && !m[1].startsWith('_') && m[2] ? capabilitiesFor(`${m[1]}-${m[2]}`, appCapabilities) : undefined;
+    const allow = m[1] && !m[1].startsWith('_') && m[2] ? withReadFrom(capabilitiesFor(`${m[1]}-${m[2]}`, appCapabilities), readFrom[`${m[1]}-${m[2]}`]) : undefined;
     for (const f of scanSource(readFileSync(file, 'utf8'), allow)) {
       count++;
       console.log(`::error file=${rel},line=${f.line}::${f.message}`);

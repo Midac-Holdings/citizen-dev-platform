@@ -50,3 +50,18 @@ export function capabilitiesFor(appId, appCapabilities) {
     api: (appCapabilities[appId] ?? []).includes('platform-api'),
   };
 }
+
+/**
+ * 宣言制の読み取り（app.manifest.json の readFrom）を、例外に加える。
+ * 申請不要：基盤の読み取り API（/api/read/...）を呼ぶ通信と、宣言したサイトの URL をコードに書くことを許可する。
+ * ブラウザから外部へ直接通信することは、引き続き CSP で禁止。
+ */
+export function withReadFrom(caps, readFrom = []) {
+  if (!Array.isArray(readFrom) || readFrom.length === 0) return caps;
+  const uniq = (xs) => [...new Set(xs)];
+  return {
+    ...caps,
+    allowRules: uniq([...caps.allowRules, 'network', 'external-url']),
+    allowHosts: uniq([...caps.allowHosts, ...readFrom]),
+  };
+}

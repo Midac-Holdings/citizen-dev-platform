@@ -132,6 +132,13 @@ export default function CreatePage() {
           </label>
           {field('hoursPerMonth')}
 
+          <label>
+            読むサイト（任意。会社HPなど外部サイトの情報を読む場合だけ）
+            <textarea rows={2} value={form.readFrom} onChange={(e) => update('readFrom', e.target.value)} placeholder="例：https://www.midac.jp/news/" />
+          </label>
+          <p className="hint">読むだけなら AI担当への申請は不要です。データを外部に送る（メール・書き込みなど）場合は、AI担当に相談してください。</p>
+          {field('readFrom')}
+
           <div className="two">
             <label>
               部署コード（URL に使う）
