@@ -41,6 +41,25 @@
 - 読み取った内容を画面に出すときは、`textContent` や React の通常の表示を使う（HTML として埋め込まない）。
 - どのアプリが、どのサイトを読んだかは記録される。
 
+## AI で文書から項目を読み取る（AI担当の許可が必要）
+- PDF・画像（契約書の写しなど）から項目を読み取る（OCR を含む）には、基盤の AI 読み取り API を使う。
+  社内の Azure OpenAI を使い、費用がかかるため、**AI担当が `tools/app-capabilities.json` に `ai-document` を登録したアプリだけ**が使える。
+  登録がないと、自動チェック（禁止パターン）と API が失敗する。作る前に AI担当に依頼する（依頼文に「AI読み取りを使う」と書く）。
+  ```ts
+  const res = await fetch(`/api/ai/<部署コード>-<アプリ名>/extract`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      fields: [{ key: 'haishutsu', label: '排出事業者', hint: '委託する側の会社名' }], // key は英小文字・数字・_。20項目まで
+      file: { name: file.name, type: file.type, data: base64 }, // PDF・PNG・JPEG、8MB まで。data は Base64
+    }),
+  });
+  const data = await res.json(); // 成功：{ values: { haishutsu: '…' }, note } ／ 失敗：{ error }
+  ```
+- 1回の読み取りに 10〜40 秒かかる。1人1分に10回まで。ページ数の多い PDF は時間切れになることがある（10ページ程度まで）。
+- AI の読み取りは間違えることがある。結果は画面で確認・修正できるようにする。
+- ファイルや読み取り結果は基盤では保存しない（アプリ側の保存先は localStorage）。
+
 ## 守ること
 - 変更するのは、自分のアプリのフォルダ（`apps/<部署コード>/<アプリ名>/`）の中だけ。
   `portal/`、`tools/`、`.github/`、ほかの人のアプリ、ルートの設定ファイルは変更しない（必要なら AI担当に相談）。

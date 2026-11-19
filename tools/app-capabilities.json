@@ -4,6 +4,9 @@
     "microsoft-graph-mail",
     "platform-api"
   ],
+  "cp-contract": [
+    "ai-document"
+  ],
   "cp-wnw": [
     "platform-api"
   ]

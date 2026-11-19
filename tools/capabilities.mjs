@@ -20,6 +20,14 @@ export const CAPABILITIES = {
     connectSrc: [],
     frameSrc: [],
   },
+  // 基盤の AI 読み取り API（/api/ai/<部署コード>-<アプリ名>/extract）で、PDF・画像から項目を読み取る。
+  // 社内の Azure OpenAI を使う（費用がかかるため、AI担当が許可したアプリだけ）
+  'ai-document': {
+    allowRules: ['network'],
+    allowHosts: [],
+    connectSrc: [],
+    frameSrc: [],
+  },
 };
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -48,6 +56,7 @@ export function capabilitiesFor(appId, appCapabilities) {
     connectSrc: uniq(caps.flatMap((c) => c.connectSrc)),
     frameSrc: uniq(caps.flatMap((c) => c.frameSrc)),
     api: (appCapabilities[appId] ?? []).includes('platform-api'),
+    ai: (appCapabilities[appId] ?? []).includes('ai-document'),
   };
 }
 
