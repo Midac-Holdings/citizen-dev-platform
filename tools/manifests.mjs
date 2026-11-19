@@ -113,6 +113,13 @@ function validateReadFrom(list, where) {
 }
 
 /** 読み取り API が使う「アプリごとの読んでよいサイト」 */
+/** AI 読み取り API を使ってよいアプリ ID の一覧（tools/app-capabilities.json の ai-document） */
+export function toAiAllowlist(apps, appCapabilities) {
+  return apps
+    .map(({ dept, app }) => `${dept}-${app}`)
+    .filter((id) => (appCapabilities[id] ?? []).includes('ai-document'));
+}
+
 export function toReadAllowlist(apps) {
   const map = {};
   for (const { dept, app, manifest } of apps) {
@@ -194,6 +201,8 @@ export function toSwaConfig(apps, appCapabilities = {}) {
     }
     appRoutes.push(route);
     if (caps.api) appRoutes.push({ route: `/api/${id}/*`, allowedRoles: [...manifest.access] });
+    // AI 読み取り（AI担当が許可したアプリだけ）：そのアプリを使える人だけが呼べる
+    if (caps.ai) appRoutes.push({ route: `/api/ai/${id}/*`, allowedRoles: [...manifest.access] });
     // 外部サイトの読み取り（申請不要・宣言制）：そのアプリを使える人だけが呼べる
     if (Array.isArray(manifest.readFrom) && manifest.readFrom.length) {
       appRoutes.push({ route: `/api/read/${id}*`, allowedRoles: [...manifest.access] });

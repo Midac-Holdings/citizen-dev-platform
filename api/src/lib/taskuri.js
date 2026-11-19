@@ -144,10 +144,10 @@ export function outputText(data) {
  * - 構造化出力（json_schema）で呼ぶ。推論モデルには考える深さ（reasoning.effort）を指定する
  * - 400 の場合は、指定を減らして再試行する（reasoning なし → JSON モード）
  */
-export async function callAzureOpenAI(cfg, messages, fetchFn = fetch, timeoutMs = 40000) {
+export async function callAzureOpenAI(cfg, messages, fetchFn = fetch, timeoutMs = 40000, schema = TASKS_SCHEMA, schemaName = 'tasks') {
   const url = `${cfg.endpoint}/openai/responses?api-version=${encodeURIComponent(cfg.apiVersion)}`;
-  const schemaFormat = { type: 'json_schema', name: 'tasks', strict: true, schema: TASKS_SCHEMA };
-  const jsonHint = { role: 'system', content: `出力は次の JSON スキーマに従う JSON オブジェクトのみ：${JSON.stringify(TASKS_SCHEMA)}` };
+  const schemaFormat = { type: 'json_schema', name: schemaName, strict: true, schema };
+  const jsonHint = { role: 'system', content: `出力は次の JSON スキーマに従う JSON オブジェクトのみ：${JSON.stringify(schema)}` };
   const attempts = [
     { input: messages, text: { format: schemaFormat }, reasoning: { effort: cfg.reasoningEffort } },
     { input: messages, text: { format: schemaFormat } },

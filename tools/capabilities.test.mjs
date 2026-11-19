@@ -25,6 +25,19 @@ describe('アプリごとの例外（ケイパビリティ）', () => {
     expect(routes.findIndex((r) => r.route === '/api/cp-tasukuri/*')).toBeLessThan(routes.findIndex((r) => r.route === '/*'));
   });
 
+  it('AI 読み取りを許可されたアプリだけ、/api/ai/<id>/* のルートと許可リストができる', async () => {
+    const { toAiAllowlist } = await import('./manifests.mjs');
+    const limited = { ...manifest, access: ['cp_contract'] };
+    const list = [...apps, { dept: 'cp', app: 'contract', manifest: limited }];
+    const aiCaps = { ...caps, 'cp-contract': ['ai-document'] };
+    const { routes } = toSwaConfig(list, aiCaps);
+    expect(routes.find((r) => r.route === '/api/ai/cp-contract/*').allowedRoles).toEqual(['cp_contract']);
+    expect(routes.find((r) => r.route === '/api/ai/cp-tasukuri/*')).toBeUndefined();
+    expect(routes.findIndex((r) => r.route === '/api/ai/cp-contract/*')).toBeLessThan(routes.findIndex((r) => r.route === '/*'));
+    expect(toAiAllowlist(list, aiCaps)).toEqual(['cp-contract']);
+    expect(scanSource("const r = await fetch(`/api/ai/cp-contract/extract`);", capabilitiesFor('cp-contract', aiCaps))).toEqual([]);
+  });
+
   it('標準の CSP は変わらない（外部への送信は禁止のまま）', () => {
     expect(CSP).toContain("connect-src 'self';");
     expect(CSP).toContain("frame-src 'none'");
