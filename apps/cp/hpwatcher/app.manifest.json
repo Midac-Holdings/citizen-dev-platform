@@ -10,7 +10,7 @@
     "authenticated"
   ],
   "request": {
-    "summary": "当社（㈱ミダックホールディングス）のHPの新着をすぐにみたい。新着のURLは以下。 https://www.midac.jp/news/ 新着が更新されるとメールが来る。",
+    "summary": "当社（㈱ミダックホールディングス）のHPの新着をすぐにみたい。新着のURLは以下。 https://www.midac.jp/news/ ",
     "access": "全社員",
     "currentWork": "新着情報をみのがさない",
     "hoursPerMonth": 0.1
