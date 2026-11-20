@@ -113,11 +113,14 @@ function validateReadFrom(list, where) {
 }
 
 /** 読み取り API が使う「アプリごとの読んでよいサイト」 */
-/** AI 読み取り API を使ってよいアプリ ID の一覧（tools/app-capabilities.json の ai-document） */
+/** AI 読み取り API を使ってよいアプリと、使えるロール（tools/app-capabilities.json の ai-document と access） */
 export function toAiAllowlist(apps, appCapabilities) {
-  return apps
-    .map(({ dept, app }) => `${dept}-${app}`)
-    .filter((id) => (appCapabilities[id] ?? []).includes('ai-document'));
+  const map = {};
+  for (const { dept, app, manifest } of apps) {
+    const id = `${dept}-${app}`;
+    if ((appCapabilities[id] ?? []).includes('ai-document')) map[id] = [...manifest.access];
+  }
+  return map;
 }
 
 export function toReadAllowlist(apps) {
@@ -201,8 +204,9 @@ export function toSwaConfig(apps, appCapabilities = {}) {
     }
     appRoutes.push(route);
     if (caps.api) appRoutes.push({ route: `/api/${id}/*`, allowedRoles: [...manifest.access] });
-    // AI 読み取り（AI担当が許可したアプリだけ）：そのアプリを使える人だけが呼べる
-    if (caps.ai) appRoutes.push({ route: `/api/ai/${id}/*`, allowedRoles: [...manifest.access] });
+    // AI 読み取り（AI担当が許可したアプリだけ）：入口ではログインだけを確認し、
+    // 「そのアプリを使える人か」は API の中でロールを照合する（招待したロールが API のルートで効かない場合があるため）
+    if (caps.ai) appRoutes.push({ route: `/api/ai/${id}/*`, allowedRoles: ['authenticated'] });
     // 外部サイトの読み取り（申請不要・宣言制）：そのアプリを使える人だけが呼べる
     if (Array.isArray(manifest.readFrom) && manifest.readFrom.length) {
       appRoutes.push({ route: `/api/read/${id}*`, allowedRoles: [...manifest.access] });

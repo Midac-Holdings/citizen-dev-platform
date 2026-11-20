@@ -31,10 +31,10 @@ describe('アプリごとの例外（ケイパビリティ）', () => {
     const list = [...apps, { dept: 'cp', app: 'contract', manifest: limited }];
     const aiCaps = { ...caps, 'cp-contract': ['ai-document'] };
     const { routes } = toSwaConfig(list, aiCaps);
-    expect(routes.find((r) => r.route === '/api/ai/cp-contract/*').allowedRoles).toEqual(['cp_contract']);
+    expect(routes.find((r) => r.route === '/api/ai/cp-contract/*').allowedRoles).toEqual(['authenticated']);
     expect(routes.find((r) => r.route === '/api/ai/cp-tasukuri/*')).toBeUndefined();
     expect(routes.findIndex((r) => r.route === '/api/ai/cp-contract/*')).toBeLessThan(routes.findIndex((r) => r.route === '/*'));
-    expect(toAiAllowlist(list, aiCaps)).toEqual(['cp-contract']);
+    expect(toAiAllowlist(list, aiCaps)).toEqual({ 'cp-contract': ['cp_contract'] });
     expect(scanSource("const r = await fetch(`/api/ai/cp-contract/extract`);", capabilitiesFor('cp-contract', aiCaps))).toEqual([]);
   });
 
