@@ -120,8 +120,16 @@ function allowRate(userId, now) {
 export async function handleAiExtract({ appId, principalHeader, body, allowlist, env, fetchFn = fetch, now = Date.now(), log = () => {} }) {
   const p = readPrincipal(principalHeader);
   if (!p || !p.userRoles?.includes('authenticated')) return { status: 401, jsonBody: { error: 'ログインが必要です' } };
-  if (!allowlist.includes(appId)) {
+  const roles = Object.hasOwn(allowlist, appId) ? allowlist[appId] : null;
+  if (!roles) {
     return { status: 403, jsonBody: { error: `アプリ「${String(appId).slice(0, 60)}」は AI 読み取りの許可がありません（AI担当に相談してください）` } };
+  }
+  // そのアプリを使える人か（app.manifest.json の access）を、ログイン情報のロールで確認する
+  const userRoles = Array.isArray(p.userRoles) ? p.userRoles : [];
+  if (!roles.some((r) => userRoles.includes(r))) {
+    const mine = userRoles.filter((r) => r !== 'anonymous').join(', ') || 'なし';
+    log(`ai-extract: app=${appId} denied roles=${mine} user=${p.userDetails ?? p.userId}`);
+    return { status: 403, jsonBody: { error: `このアプリを使う権限がありません（必要なロール：${roles.join(', ')}／あなたのロール：${mine}）。AI担当に確認してください` } };
   }
   if (!allowRate(p.userId, now)) {
     return { status: 429, jsonBody: { error: `AI 読み取りは1人1分に ${LIMITS.perUserPerMinute} 回までです。少し待ってからお試しください` } };

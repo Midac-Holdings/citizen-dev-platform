@@ -4,13 +4,13 @@ import { handleAiExtract } from '../lib/aiExtract.js';
 
 // POST /api/ai/{アプリID}/extract
 // PDF・画像から、アプリが指定した項目を社内の Azure OpenAI で読み取る（AI担当が許可したアプリだけ）。
-// 「使ってよいアプリ」は、ビルド時に tools/generate.mjs が tools/app-capabilities.json から作る。
-// 利用できる人は staticwebapp.config.json（app.manifest.json の access から自動生成）で制限される。
-let allowlist = [];
+// 「使ってよいアプリと、使えるロール」は、ビルド時に tools/generate.mjs が
+// tools/app-capabilities.json と app.manifest.json の access から作る。ロールの照合はこの API の中で行う。
+let allowlist = {};
 try {
   allowlist = JSON.parse(readFileSync(new URL('../generated/ai-apps.json', import.meta.url), 'utf8'));
 } catch {
-  allowlist = [];
+  allowlist = {};
 }
 
 app.http('ai-extract', {
