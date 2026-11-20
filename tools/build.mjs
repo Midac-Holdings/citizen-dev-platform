@@ -1,12 +1,13 @@
 // ポータルと全アプリをビルドし、dist/ に1つのサイトとしてまとめる。
 //   dist/                     ポータル
 //   dist/<部署コード>/<アプリ名>/  各アプリ
-//   dist/staticwebapp.config.json  パスごとのアクセス設定（自動生成）
+//   dist/staticwebapp.config.json  パスごとのアクセス設定（自動生成・静的 Web アプリ用。テスト担当だけ）
+//   appservice/generated/config.json  同じ設定の App Service 用（全社員向けのページはログインした社員なら使える）
 import { execFileSync } from 'node:child_process';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadApps, toSwaConfig } from './manifests.mjs';
+import { loadApps, restrictToTesters, toSwaConfig } from './manifests.mjs';
 import { loadAppCapabilities } from './capabilities.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -32,5 +33,10 @@ for (const { dept, app, manifest } of apps) {
   run(['run', 'build', '-w', `apps/${dept}/${app}`, '--', '--base', base, '--outDir', join(dist, dept, app), '--emptyOutDir']);
 }
 
-writeFileSync(join(dist, 'staticwebapp.config.json'), JSON.stringify(toSwaConfig(apps, loadAppCapabilities()), null, 2) + '\n');
+const config = toSwaConfig(apps, loadAppCapabilities());
+// 静的 Web アプリ（PR のプレビュー用）：全社員向けのページも、テスト担当（preview_tester）だけにする
+writeFileSync(join(dist, 'staticwebapp.config.json'), JSON.stringify(restrictToTesters(config), null, 2) + '\n');
+// App Service（社員が使う入口・IP 制限＋社内のみ）：全社員向けのページは、ログインした社員なら使える
+mkdirSync(join(root, 'appservice/generated'), { recursive: true });
+writeFileSync(join(root, 'appservice/generated/config.json'), JSON.stringify(config, null, 2) + '\n');
 console.log(`\n✔ dist/ にまとめました（アプリ ${apps.length}件）`);

@@ -240,6 +240,23 @@ export function toSwaConfig(apps, appCapabilities = {}) {
   };
 }
 
+/** 静的 Web アプリ（PR のプレビュー用）を開けるロール。AI担当が、テストする人にだけ招待で付ける */
+export const TESTER_ROLE = 'preview_tester';
+
+/**
+ * 静的 Web アプリ用に、全社員向け（authenticated）のページと API を、テスト担当だけにする。
+ * 社員が使う入口は App Service（IP 制限＋社内のみ）。静的 Web アプリは PR のプレビュー専用。
+ * ロール限定のアプリ（例：cp_contract）は、そのロールのまま（ロールは AI担当の招待でしか付かない）。
+ */
+export function restrictToTesters(config, role = TESTER_ROLE) {
+  return {
+    ...config,
+    routes: config.routes.map((r) =>
+      r.allowedRoles?.includes('authenticated') ? { ...r, allowedRoles: r.allowedRoles.map((x) => (x === 'authenticated' ? role : x)) } : r,
+    ),
+  };
+}
+
 /** 読み込み＋検証。エラーがあれば例外にする。 */
 export function loadApps(appsDir) {
   const apps = discoverApps(appsDir);

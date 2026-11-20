@@ -20,9 +20,10 @@ const readJson = (p, fallback) => {
   }
 };
 
-const config = readJson('dist/staticwebapp.config.json', null);
+// App Service 用の設定（tools/build.mjs が作る）。静的 Web アプリ用（テスト担当だけ）とは別
+const config = readJson('appservice/generated/config.json', null);
 if (!config) {
-  console.error('dist/staticwebapp.config.json がありません（npm run build のあとに起動してください）');
+  console.error('appservice/generated/config.json がありません（npm run build のあとに起動してください）');
   process.exit(1);
 }
 const readAllowlist = readJson('api/src/generated/read-from.json', {});
