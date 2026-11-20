@@ -2,8 +2,10 @@ name: App Service（F1 試作）に公開
 
 # 試作：main と同じ内容を App Service（F1）にも公開する。今の Static Web Apps はそのまま。
 # 準備（appservice/README.md）：
-#   - シークレット AZURE_WEBAPP_PUBLISH_PROFILE（App Service の「発行プロファイル」の中身）
-#   - 変数 AZURE_WEBAPP_NAME（App Service の名前）
+#   - GitHub の環境（Environments）production：main ブランチからしか使えないようにする
+#   - production の環境シークレット AZURE_WEBAPP_PUBLISH_PROFILE（App Service の「発行プロファイル」の中身）
+#     ※リポジトリのシークレットに置くと、市民のブランチのワークフローからも使えてしまうため、必ず環境に置く
+#   - 変数 AZURE_WEBAPP_NAME（App Service の名前。秘密ではない）
 # どちらかが未登録なら、公開はスキップする。
 on:
   push:
@@ -21,6 +23,8 @@ jobs:
   deploy:
     name: App Service に公開
     runs-on: ubuntu-latest
+    # 鍵は main からしか使えない環境に置く（環境の設定で、main 以外のブランチを拒否する）
+    environment: production
     env:
       PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
       WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}

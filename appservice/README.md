@@ -44,10 +44,13 @@ Entra ID →「エンタープライズ アプリケーション」→ 同じア
 - 高度なツール サイト（SCM）：**制限しない**（GitHub からの公開に使うため。発行資格情報がないと使えない）
 
 ## 6. GitHub から公開する
+- GitHub → Settings → Environments →「New environment」：名前 `production`
+  - Deployment branches and tags：**Selected branches and tags** → `main` だけを追加
 - App Service の「概要」→「**発行プロファイルのダウンロード**」
-- GitHub → Settings → Secrets and variables → Actions
-  - Secrets：`AZURE_WEBAPP_PUBLISH_PROFILE` ＝ ダウンロードしたファイルの中身
-  - Variables：`AZURE_WEBAPP_NAME` ＝ App Service の名前
+- `production` の Environment secrets：`AZURE_WEBAPP_PUBLISH_PROFILE` ＝ ダウンロードしたファイルの中身
+  - ⚠ リポジトリのシークレット（Settings → Secrets and variables → Actions）には置かない。
+    市民のブランチで書き換えたワークフローからも使えてしまうため
+- GitHub → Settings → Secrets and variables → Actions → Variables：`AZURE_WEBAPP_NAME` ＝ App Service の名前
 - Actions →「App Service（F1 試作）に公開」→「Run workflow」（以後は main へのマージで自動）
 
 ## 7. そのほか
