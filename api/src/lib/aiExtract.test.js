@@ -13,6 +13,8 @@ const env = { AZURE_OPENAI_ENDPOINT: 'https://x.openai.azure.com', AZURE_OPENAI_
 const okFetch = (out) => async () =>
   new Response(JSON.stringify({ output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(out) }] }] }), { status: 200 });
 
+const AL = { 'cp-contract': ['authenticated'] };
+
 beforeEach(() => resetRate());
 
 describe('AI 読み取り：入力の検証', () => {
@@ -60,9 +62,27 @@ describe('AI 読み取り：呼び出し1回分', () => {
   const body = { fields, file: { name: 'a.pdf', type: 'application/pdf', data: pdf } };
 
   it('ログインしていない・許可のないアプリは断る', async () => {
-    expect((await handleAiExtract({ appId: 'cp-contract', principalHeader: null, body, allowlist: ['cp-contract'], env })).status).toBe(401);
-    const r = await handleAiExtract({ appId: 'cp-other', principalHeader: principal(), body, allowlist: ['cp-contract'], env });
+    expect((await handleAiExtract({ appId: 'cp-contract', principalHeader: null, body, allowlist: AL, env })).status).toBe(401);
+    const r = await handleAiExtract({ appId: 'cp-other', principalHeader: principal(), body, allowlist: AL, env });
     expect(r.status).toBe(403);
+  });
+
+  it('アプリの access のロールがない人は断る（必要なロールを表示する）', async () => {
+    const r = await handleAiExtract({ appId: 'cp-contract', principalHeader: principal(), body, allowlist: { 'cp-contract': ['cp_contract'] }, env });
+    expect(r.status).toBe(403);
+    expect(r.jsonBody.error).toContain('必要なロール：cp_contract');
+    expect(r.jsonBody.error).toContain('あなたのロール：authenticated');
+    const ok = await handleAiExtract({
+      appId: 'cp-contract',
+      principalHeader: principal(['authenticated', 'cp_contract']),
+      body,
+      allowlist: { 'cp-contract': ['cp_contract'] },
+      env,
+      fetchFn: okFetch({ values: {}, note: '' }),
+    });
+    expect(ok.status).toBe(200);
+    const proto = await handleAiExtract({ appId: 'constructor', principalHeader: principal(), body, allowlist: AL, env });
+    expect(proto.status).toBe(403);
   });
 
   it('許可されたアプリは読み取れる。ログに内容は残さない', async () => {
@@ -71,7 +91,7 @@ describe('AI 読み取り：呼び出し1回分', () => {
       appId: 'cp-contract',
       principalHeader: principal(),
       body,
-      allowlist: ['cp-contract'],
+      allowlist: AL,
       env,
       fetchFn: okFetch({ values: { haishutsu: '株式会社A', seikyu: '' }, note: '' }),
       log: (m) => logs.push(m),
@@ -83,10 +103,10 @@ describe('AI 読み取り：呼び出し1回分', () => {
   });
 
   it('設定がなければ 503、回数の上限を超えたら 429', async () => {
-    expect((await handleAiExtract({ appId: 'cp-contract', principalHeader: principal(), body, allowlist: ['cp-contract'], env: {} })).status).toBe(503);
+    expect((await handleAiExtract({ appId: 'cp-contract', principalHeader: principal(), body, allowlist: AL, env: {} })).status).toBe(503);
     let last;
     for (let i = 0; i < 11; i++) {
-      last = await handleAiExtract({ appId: 'cp-contract', principalHeader: principal(), body, allowlist: ['cp-contract'], env, fetchFn: okFetch({ values: {}, note: '' }), now: 0 });
+      last = await handleAiExtract({ appId: 'cp-contract', principalHeader: principal(), body, allowlist: AL, env, fetchFn: okFetch({ values: {}, note: '' }), now: 0 });
     }
     expect(last.status).toBe(429);
   });
