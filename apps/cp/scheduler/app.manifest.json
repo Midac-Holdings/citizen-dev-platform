@@ -1,0 +1,18 @@
+{
+  "name": "会議室予約",
+  "description": "チャットで日時と会議室を伝えるだけで会議室を予約できます。予約は DeskNet's に取り込める CSV で出力できます（保存先はこのブラウザ内）。",
+  "category": "申請・手続き",
+  "icon": "🗓️",
+  "color": "#1f8a4c",
+  "owner": "CP",
+  "status": "available",
+  "access": [
+    "authenticated"
+  ],
+  "request": {
+    "summary": "会議室予約がDeskNetsと連動して、チャットで指定できる",
+    "access": "全社員",
+    "currentWork": "スケジュール設定",
+    "hoursPerMonth": 10
+  }
+}
