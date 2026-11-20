@@ -1,0 +1,18 @@
+{
+  "name": "契約情報抽出",
+  "description": "契約書の写し（PDF）から、排出事業者・運搬事業者・排出事業場・処分事業場・請求先を AI で読み取り、台帳として Excel に出力します。",
+  "category": "管理",
+  "icon": "📑",
+  "color": "#2d6cdf",
+  "owner": "CP",
+  "status": "available",
+  "access": [
+    "cp_contract"
+  ],
+  "request": {
+    "summary": "契約書の写し（PDF）を添付すると、AI 読み取りで排出事業者・運搬事業者・排出事業場・処分事業場・請求先を抽出する。Excel に出力でき、件数を重ねると追記されていく。AI 読み取りを使う",
+    "access": "特定メンバー（契約担当（ロール cp_contract））",
+    "currentWork": "手入力で台帳に転記",
+    "hoursPerMonth": 5
+  }
+}
