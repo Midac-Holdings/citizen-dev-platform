@@ -11,12 +11,13 @@
     "generate": "node tools/generate.mjs",
     "check:manifests": "node tools/generate.mjs --check",
     "new-app": "node tools/new-app.mjs",
-    "test": "vitest run tools api && npm run test --workspaces --if-present",
+    "test": "vitest run tools api appservice && npm run test --workspaces --if-present",
     "build": "node tools/build.mjs",
     "dev:portal": "npm run dev -w portal",
     "check:scope": "node tools/check-scope.mjs",
     "check:safety": "node tools/check-safety.mjs",
-    "smoke": "node tools/smoke.mjs"
+    "smoke": "node tools/smoke.mjs",
+    "start": "node appservice/server.mjs"
   },
   "devDependencies": {
     "vitest": "^5.0.5",
