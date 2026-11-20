@@ -1,0 +1,79 @@
+name: App Service（F1 試作）に公開
+
+# 試作：main と同じ内容を App Service（F1）にも公開する。今の Static Web Apps はそのまま。
+# 準備（appservice/README.md）：
+#   - シークレット AZURE_WEBAPP_PUBLISH_PROFILE（App Service の「発行プロファイル」の中身）
+#   - 変数 AZURE_WEBAPP_NAME（App Service の名前）
+# どちらかが未登録なら、公開はスキップする。
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: App Service に公開
+    runs-on: ubuntu-latest
+    env:
+      PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+      WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
+    steps:
+      - name: 準備の確認
+        id: ready
+        run: |
+          if [ -z "$PUBLISH_PROFILE" ] || [ -z "$WEBAPP_NAME" ]; then
+            echo "::warning::AZURE_WEBAPP_PUBLISH_PROFILE（シークレット）または AZURE_WEBAPP_NAME（変数）が未登録のため、公開をスキップしました"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.ready.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v5
+        if: steps.ready.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: ビルドとテスト
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          npm ci
+          npm run check:manifests
+          npm run check:safety
+          npm test
+          npm run build
+
+      - name: 公開用にまとめる（外部ライブラリなし。Node.js の標準機能だけで動く）
+        if: steps.ready.outputs.ok == 'true'
+        run: |
+          mkdir -p deploy/api/src
+          cp -r dist appservice deploy/
+          cp -r api/src/lib api/src/generated deploy/api/src/
+          find deploy -name '*.test.*' -delete
+          cat > deploy/package.json <<'JSON'
+          {
+            "name": "citizen-dev-platform-appservice",
+            "private": true,
+            "type": "module",
+            "engines": { "node": ">=22" },
+            "scripts": { "start": "node appservice/server.mjs" }
+          }
+          JSON
+
+      - name: App Service に公開
+        if: steps.ready.outputs.ok == 'true'
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy
