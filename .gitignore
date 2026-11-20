@@ -8,3 +8,4 @@ coverage
 .DS_Store
 portal/src/generated/
 api/src/generated/
+appservice/generated/

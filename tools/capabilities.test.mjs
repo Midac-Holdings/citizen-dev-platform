@@ -38,6 +38,20 @@ describe('アプリごとの例外（ケイパビリティ）', () => {
     expect(scanSource("const r = await fetch(`/api/ai/cp-contract/extract`);", capabilitiesFor('cp-contract', aiCaps))).toEqual([]);
   });
 
+  it('静的 Web アプリ用は、全社員向けのページと API をテスト担当だけにする（ロール限定はそのまま）', async () => {
+    const { restrictToTesters } = await import('./manifests.mjs');
+    const list = [...apps, { dept: 'cp', app: 'contract', manifest: { ...manifest, access: ['cp_contract'] } }];
+    const { routes } = restrictToTesters(toSwaConfig(list, { ...caps, 'cp-contract': ['ai-document'] }));
+    const roles = (r) => routes.find((x) => x.route === r).allowedRoles;
+    expect(roles('/*')).toEqual(['preview_tester']);
+    expect(roles('/cp/tasukuri/*')).toEqual(['preview_tester']);
+    expect(roles('/api/cp-tasukuri/*')).toEqual(['preview_tester']);
+    expect(roles('/api/ai/cp-contract/*')).toEqual(['preview_tester']);
+    expect(roles('/cp/contract/*')).toEqual(['cp_contract']);
+    expect(roles('/admin*')).toEqual(['portal_admin']);
+    expect(routes.flatMap((r) => r.allowedRoles ?? [])).not.toContain('authenticated');
+  });
+
   it('標準の CSP は変わらない（外部への送信は禁止のまま）', () => {
     expect(CSP).toContain("connect-src 'self';");
     expect(CSP).toContain("frame-src 'none'");
