@@ -66,6 +66,19 @@ describe('契約情報抽出', () => {
     expect(screen.getByText('A社')).toBeInTheDocument();
   });
 
+  it('契約書に記載がない項目（請求先など）は、台帳に「記載なし」と表示する', async () => {
+    const user = userEvent.setup();
+    const f = (async () =>
+      new Response(
+        JSON.stringify({ values: { haishutsu_jigyosha: 'C社', unpan_jigyosha: '運搬', haishutsu_jigyojo: '工場', shobun_jigyojo: '処分', seikyusaki: '' }, note: '' }),
+        { status: 200 },
+      )) as typeof fetch;
+    render(<App fetchFn={f} />);
+    await readAndAdd(user);
+    const seikyu = screen.getByText('請求先', { selector: 'dt' }).nextElementSibling;
+    expect(seikyu).toHaveTextContent('記載なし');
+  });
+
   it('読み取りに失敗したらエラーを表示する', async () => {
     const user = userEvent.setup();
     const f = (async () => new Response(JSON.stringify({ error: 'AI の設定がまだありません' }), { status: 503 })) as typeof fetch;

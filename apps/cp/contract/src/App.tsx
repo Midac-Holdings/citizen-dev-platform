@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { exportFileName, fmtDateTime, toXlsxBlob } from './excel';
 import { checkFile, extractContract, type ExtractResult } from './extract';
-import { FIELDS, type FieldKey, type Values } from './fields';
+import { FIELDS, NOT_FOUND, displayValue, type FieldKey, type Values } from './fields';
 import { loadEntries, saveEntries, type Entry } from './storage';
 
 type Props = {
@@ -140,7 +140,7 @@ export default function App({ fetchFn, download = saveFile, now = () => new Date
             {FIELDS.map((f) => (
               <label key={f.key}>
                 {f.label}
-                <textarea rows={2} value={draft.values[f.key]} onChange={(e) => edit(f.key, e.target.value)} placeholder="（読み取れませんでした）" />
+                <textarea rows={2} value={draft.values[f.key]} onChange={(e) => edit(f.key, e.target.value)} placeholder={`${NOT_FOUND}（このまま追加すると「${NOT_FOUND}」と表示）`} />
               </label>
             ))}
             {draft.note && <p className="muted small">AI からの補足：{draft.note}</p>}
@@ -185,7 +185,7 @@ export default function App({ fetchFn, download = saveFile, now = () => new Date
                     {FIELDS.map((f) => (
                       <div key={f.key}>
                         <dt>{f.label}</dt>
-                        <dd>{e[f.key] || '—'}</dd>
+                        <dd className={e[f.key].trim() ? undefined : 'muted'}>{displayValue(e[f.key])}</dd>
                       </div>
                     ))}
                   </dl>

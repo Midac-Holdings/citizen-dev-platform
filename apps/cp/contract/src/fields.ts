@@ -12,3 +12,9 @@ export type Values = Record<FieldKey, string>;
 
 export const emptyValues = (): Values =>
   Object.fromEntries(FIELDS.map((f) => [f.key, ''])) as Values;
+
+/** 読み取れなかった（契約書に記載がない）項目の表示 */
+export const NOT_FOUND = '記載なし';
+
+/** 台帳・Excel に出すときの値。空欄なら「記載なし」にする */
+export const displayValue = (v: string): string => (v.trim() ? v : NOT_FOUND);

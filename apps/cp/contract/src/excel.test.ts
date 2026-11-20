@@ -24,6 +24,12 @@ describe('Excel 出力', () => {
     expect(rows[3].slice(0, 4)).toEqual(['3', expect.stringMatching(/^2026\/11\/20 /), '契約3.pdf', '排出3']);
   });
 
+  it('読み取れなかった項目は「記載なし」と出力する（5項目すべて）', () => {
+    const empty: Entry = { ...entry(1), haishutsu_jigyosha: '', unpan_jigyosha: ' ', haishutsu_jigyojo: '', shobun_jigyojo: '', seikyusaki: '' };
+    expect(toRows([empty])[1].slice(3, 8)).toEqual(['記載なし', '記載なし', '記載なし', '記載なし', '記載なし']);
+    expect(toRows([entry(1)])[1][7]).toBe('請求');
+  });
+
   it('.xlsx ファイル（ZIP 形式）を作る', async () => {
     const blob = await toXlsxBlob([entry(1)]);
     const head = new Uint8Array(await blob.arrayBuffer()).subarray(0, 2);
