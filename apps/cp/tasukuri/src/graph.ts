@@ -102,8 +102,6 @@ export interface MailForAi {
   ccCount: number;
   importance: string;
   body: string;
-  /** 画面用（AI には送らない） */
-  webLink: string;
 }
 
 interface GraphRecipient {
@@ -115,7 +113,7 @@ interface GraphMessage {
   subject?: string;
   receivedDateTime: string;
   importance?: string;
-  webLink?: string;
+  hasAttachments?: boolean;
   from?: GraphRecipient;
   toRecipients?: GraphRecipient[];
   ccRecipients?: GraphRecipient[];
@@ -126,7 +124,9 @@ async function graphGet<T>(token: string, url: string): Promise<T> {
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, Prefer: 'outlook.body-content-type="text"' },
   });
-  if (!res.ok) throw new Error(`メールを読み込めませんでした（Microsoft Graph：HTTP ${res.status}）`);
+  if (!res.ok) {
+    throw Object.assign(new Error(`メールを読み込めませんでした（Microsoft Graph：HTTP ${res.status}）`), { status: res.status });
+  }
   return (await res.json()) as T;
 }
 
@@ -165,7 +165,6 @@ export function toMailForAi(m: GraphMessage, myEmail: string): MailForAi {
     ccCount: m.ccRecipients?.length ?? 0,
     importance: m.importance ?? 'normal',
     body: cleanBody(m.body?.content ?? ''),
-    webLink: m.webLink ?? '',
   };
 }
 
@@ -176,7 +175,7 @@ export async function listInboxMails(token: string, me: Me, days: number, max: n
     $filter: `receivedDateTime ge ${since}`,
     $orderby: 'receivedDateTime desc',
     $top: '50',
-    $select: 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,importance,webLink',
+    $select: 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,importance',
   });
   let url: string | undefined = `${GRAPH}/me/mailFolders/inbox/messages?${params}`;
   const mails: MailForAi[] = [];
@@ -186,4 +185,49 @@ export async function listInboxMails(token: string, me: Me, days: number, max: n
     url = page['@odata.nextLink'];
   }
   return mails.slice(0, max);
+}
+
+/** タスクリの画面で見せる元のメール（文字だけ。画面に出すだけで保存しない） */
+export interface OriginalMail {
+  subject: string;
+  from: string;
+  to: string[];
+  cc: string[];
+  /** ISO 日時 */
+  receivedAt: string;
+  hasAttachments: boolean;
+  /** 本文（文字だけ。引用部分も含めてそのまま） */
+  body: string;
+}
+
+const nameAndAddress = (r?: GraphRecipient) => {
+  const a = r?.emailAddress;
+  if (!a) return '';
+  return a.name && a.address && a.name !== a.address ? `${a.name} <${a.address}>` : (a.name || a.address || '');
+};
+
+export function toOriginalMail(m: GraphMessage): OriginalMail {
+  return {
+    subject: m.subject || '（件名なし）',
+    from: nameAndAddress(m.from),
+    to: (m.toRecipients ?? []).map(nameAndAddress).filter(Boolean),
+    cc: (m.ccRecipients ?? []).map(nameAndAddress).filter(Boolean),
+    receivedAt: m.receivedDateTime,
+    hasAttachments: Boolean(m.hasAttachments),
+    body: (m.body?.content ?? '').replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
+}
+
+/** 元のメールを1通だけ読む（受信トレイから別のフォルダに移していても読める） */
+export async function getOriginalMail(token: string, mailId: string): Promise<OriginalMail> {
+  const select = 'subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments';
+  try {
+    const m = await graphGet<GraphMessage>(token, `${GRAPH}/me/messages/${encodeURIComponent(mailId)}?$select=${select}`);
+    return toOriginalMail(m);
+  } catch (e) {
+    if ((e as { status?: number }).status === 404) {
+      throw new Error('元のメールが見つかりません（削除されたか、別のメールボックスに移された可能性があります）');
+    }
+    throw e;
+  }
 }

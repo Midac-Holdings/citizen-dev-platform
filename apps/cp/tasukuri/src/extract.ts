@@ -5,7 +5,7 @@
  *   3. 5通ずつ基盤の API（/api/cp-tasukuri/extract → 社内の Azure OpenAI）に送って、タスクを受け取る
  */
 import { MAILS_PER_REQUEST, MAX_MAILS } from './config';
-import { getGraphToken, getMe, listInboxMails, type MailForAi } from './graph';
+import { getGraphToken, getMe, getOriginalMail, listInboxMails, type MailForAi, type OriginalMail } from './graph';
 import { toDateKey, type Task } from './tasks';
 
 export type Progress =
@@ -51,7 +51,7 @@ export function toTasks(apiTasks: ApiTask[], mails: MailForAi[]): Task[] {
         mailSubject: mail.subject,
         mailFrom: mail.from.replace(/\s*<[^>]*>$/, ''),
         mailReceivedAt: mail.receivedAt,
-        mailLink: mail.webLink || undefined,
+        mailId: mail.id,
       },
     ];
   });
@@ -64,8 +64,7 @@ async function extractBatch(today: Date, me: { name: string; email: string }, ma
     body: JSON.stringify({
       today: toDateKey(today),
       me,
-      // 画面用のリンクは AI に送らない
-      mails: mails.map(({ webLink: _webLink, ...m }) => m),
+      mails,
     }),
   });
   const data = (await res.json().catch(() => ({}))) as { tasks?: ApiTask[]; error?: string };
@@ -98,4 +97,14 @@ export async function extractFromMail(
   const tasks = toTasks(apiTasks, mails);
   onProgress({ phase: 'done', mails: mails.length, tasks: tasks.length });
   return { tasks, mails: mails.length };
+}
+
+/**
+ * 元のメールを1通読む。サインインのために Microsoft の画面へ移動する場合は null を返す
+ * （戻ってきたら、もう一度呼ぶ）。
+ */
+export async function fetchOriginalMail(mailId: string): Promise<OriginalMail | null> {
+  const token = await getGraphToken();
+  if (!token) return null;
+  return getOriginalMail(token, mailId);
 }

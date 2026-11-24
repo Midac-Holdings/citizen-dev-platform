@@ -34,8 +34,18 @@ export interface Task {
   mailFrom: string;
   /** ISO 日時 */
   mailReceivedAt: string;
-  /** Outlook でメールを開くリンク（実メールのときだけ） */
-  mailLink?: string;
+  /** 元のメールの ID（Microsoft Graph。実メールのときだけ） */
+  mailId?: string;
+}
+
+/**
+ * 元のメールの ID。実メールのタスクの ID は「メールID#連番」なので、
+ * mailId がない古い保存データからも取り出せる。サンプルは null。
+ */
+export function originalMailIdOf(t: Task): string | null {
+  if (t.mailId) return t.mailId;
+  const m = /^(.+)#\d+$/.exec(t.id);
+  return m ? m[1] : null;
 }
 
 // ---------------------------------------------------------------- 日付
