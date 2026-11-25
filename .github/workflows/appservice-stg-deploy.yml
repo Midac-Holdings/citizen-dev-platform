@@ -1,0 +1,126 @@
+name: 検証用 App Service（stg）に公開
+
+# マージ前の確認用：PR の内容を、検証用の App Service（本番と同じ仕組み：テナント限定ログイン・IP 制限）に公開する。
+# 使い方：Actions →「検証用 App Service（stg）に公開」→「Run workflow」→ PR の番号を入れる（空なら main）
+# 準備（appservice/README.md の「検証用（stg）」）：
+#   - GitHub の環境（Environments）staging：main ブランチからしか使えないようにする
+#   - staging の環境シークレット AZURE_WEBAPP_PUBLISH_PROFILE（検証用 App Service の「発行プロファイル」の中身）
+#   - staging の環境変数 AZURE_WEBAPP_NAME_STG（検証用 App Service の名前。秘密ではない）
+#
+# 安全のため、ジョブを2つに分けている：
+#   build  ：PR のコードをビルドする。鍵（発行プロファイル）は渡さない
+#   deploy ：build の結果（ファイル）を受け取って公開するだけ。PR のコードは実行しない
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 公開する PR の番号（空なら main）
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: ビルド（PR ${{ inputs.pr || 'なし：main' }}）
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - name: PR の番号の確認
+        env:
+          PR: ${{ inputs.pr }}
+        run: |
+          if [ -n "$PR" ] && ! printf '%s' "$PR" | grep -Eq '^[0-9]{1,6}$'; then
+            echo "::error::PR の番号は数字で入れてください（例：23）"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.pr && format('refs/pull/{0}/head', inputs.pr) || 'main' }}
+          persist-credentials: false
+
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          cache: npm
+
+      - name: ビルドとテスト
+        run: |
+          npm ci
+          npm run check:manifests
+          npm run check:safety
+          npm test
+          npm run build
+
+      - name: 公開用にまとめる（本番と同じ形）
+        run: |
+          mkdir -p deploy/api/src
+          cp -r dist appservice deploy/
+          cp -r api/src/lib api/src/generated deploy/api/src/
+          find deploy -name '*.test.*' -delete
+          cat > deploy/package.json <<'JSON'
+          {
+            "name": "citizen-dev-platform-appservice",
+            "private": true,
+            "type": "module",
+            "engines": { "node": ">=22" },
+            "scripts": { "start": "node appservice/server.mjs" }
+          }
+          JSON
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: appservice-stg
+          path: deploy
+          retention-days: 1
+
+  deploy:
+    name: 検証用 App Service に公開
+    needs: build
+    runs-on: ubuntu-latest
+    # 鍵は main からしか使えない環境に置く（環境の設定で、main 以外のブランチを拒否する）
+    environment: staging
+    env:
+      PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+      WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME_STG }}
+    steps:
+      - name: 準備の確認
+        run: |
+          if [ -z "$PUBLISH_PROFILE" ] || [ -z "$WEBAPP_NAME" ]; then
+            echo "::error::環境 staging に AZURE_WEBAPP_PUBLISH_PROFILE（シークレット）または AZURE_WEBAPP_NAME_STG（変数）が未登録です（appservice/README.md の「検証用（stg）」）"
+            exit 1
+          fi
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: appservice-stg
+          path: deploy
+
+      - name: 検証用 App Service に公開
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME_STG }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: deploy
+
+      - name: 公開した内容
+        env:
+          PR: ${{ inputs.pr }}
+          SHA: ${{ needs.build.outputs.sha }}
+        run: |
+          {
+            echo "### 検証用 App Service に公開しました"
+            if [ -n "$PR" ]; then echo "- PR：#$PR"; else echo "- main"; fi
+            echo "- コミット：\`$SHA\`"
+            echo "- 次に別の PR を公開すると上書きされます（検証用は1つだけ）"
+          } >> "$GITHUB_STEP_SUMMARY"
