@@ -23,7 +23,7 @@ describe('App', () => {
 
     expect(await screen.findByText('債権.csv：5件')).toBeInTheDocument();
     expect(screen.queryByText('5 / 5件')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: '消込開始' }));
+    await user.click(screen.getByRole('button', { name: /消込開始/ }));
     expect(screen.getByText('5 / 5件')).toBeInTheDocument();
     expect(screen.getByText('消込済（複数の請求をまとめて入金）')).toBeInTheDocument();
     expect(screen.getByText('要確認（金額のみ一致）')).toBeInTheDocument();
@@ -49,7 +49,7 @@ describe('App', () => {
     render(<App />);
     await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
     await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
-    await user.click(screen.getByRole('button', { name: '消込開始' }));
+    await user.click(screen.getByRole('button', { name: /消込開始/ }));
     expect(await screen.findByText('5 / 5件')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '全データ削除' }));
@@ -65,7 +65,7 @@ describe('App', () => {
   it('両方そろうまで消込開始は押せず、データや設定を変えると押し直しになる', async () => {
     const user = userEvent.setup();
     render(<App />);
-    const start = screen.getByRole('button', { name: '消込開始' });
+    const start = screen.getByRole('button', { name: /消込開始/ });
     expect(start).toBeDisabled();
     await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
     await screen.findByText('債権.csv：5件');

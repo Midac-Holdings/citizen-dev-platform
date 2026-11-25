@@ -41,5 +41,10 @@ button.sub { background: #e7effb; color: var(--blue); }
 td.num { text-align: right; white-space: nowrap; }
 tr.warn td { background: #fff4d6; }
 button.danger { background: #fdecea; color: #c0392b; }
-button.start { font-size: 1.05rem; padding: 14px; }
+
 button:disabled { background: #c9d3e1; color: #fff; cursor: not-allowed; }
+.startbar { display: grid; justify-items: center; gap: 8px; padding: 8px 0; text-align: center; }
+.startbar .start { width: min(360px, 100%); font-size: 1.2rem; padding: 16px; border-radius: 999px; box-shadow: 0 6px 18px rgba(29, 95, 196, 0.25); }
+.startbar .start:disabled { box-shadow: none; }
+.center { display: flex; justify-content: center; }
+.download { width: min(360px, 100%); }

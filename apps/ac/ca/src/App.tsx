@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { decodeBytes, parseCsv, toCsv } from './csv';
-import { loadPayments, loadReceivables, SAMPLE_PAYMENTS, SAMPLE_RECEIVABLES } from './data';
+import { loadPayments, loadReceivables } from './data';
 import type { Payment, Receivable } from './data';
 import { KIND_LABEL, reconcile, resultRows } from './match';
 
@@ -107,7 +107,6 @@ export default function App() {
           </label>
           {saved.receivableFile && <p className="done">{saved.receivableFile}：{saved.receivables.length}件</p>}
           {messages.receivables.map((m) => <p className="error" key={m}>{m}</p>)}
-          <button type="button" className="sub" onClick={() => download('債権サンプル.csv', SAMPLE_RECEIVABLES)}>サンプル CSV をダウンロード</button>
         </section>
 
         <section className="card">
@@ -119,7 +118,6 @@ export default function App() {
           </label>
           {saved.paymentFile && <p className="done">{saved.paymentFile}：{saved.payments.length}件</p>}
           {messages.payments.map((m) => <p className="error" key={m}>{m}</p>)}
-          <button type="button" className="sub" onClick={() => download('入金サンプル.csv', SAMPLE_PAYMENTS)}>サンプル CSV をダウンロード</button>
         </section>
 
         <section className="card">
@@ -140,18 +138,22 @@ export default function App() {
           </button>
         </section>
 
-        <section className="card wide">
-          <h2>④ 消込</h2>
+        <section className="startbar wide">
           <button type="button" className="start" onClick={start} disabled={!ready}>
-            消込開始
+            ▶ 消込開始
           </button>
-          {!result ? (
+          {!result && (
             <p className="muted">
               {ready
                 ? '「消込開始」を押すと、債権と入金を突き合わせて結果を表示します。'
                 : '①債権と②入金の CSV を両方アップすると、「消込開始」を押せるようになります。'}
             </p>
-          ) : (
+          )}
+        </section>
+
+        {result && (
+          <section className="card wide">
+            <h2>④ 消込結果</h2>
             <>
               <div className="stats">
                 <div><span>消込できた債権</span><strong>{matchedReceivables} / {saved.receivables.length}件</strong></div>
@@ -206,11 +208,15 @@ export default function App() {
                   </table>
                 )}
               </div>
-              <button type="button" onClick={() => download('消込結果.csv', resultRows(result))}>結果を CSV でダウンロード</button>
               <p className="muted">「要確認」は名義が一致せず金額だけが一致したものです。内容を確認してから会計システムへ反映してください。</p>
+              <div className="center">
+                <button type="button" className="download" onClick={() => download('消込結果.csv', resultRows(result))}>
+                  ⬇ 消込結果を CSV でダウンロード
+                </button>
+              </div>
             </>
-          )}
-        </section>
+          </section>
+        )}
       </main>
     </div>
   );
