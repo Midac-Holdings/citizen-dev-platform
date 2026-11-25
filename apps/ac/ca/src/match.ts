@@ -1,36 +1,64 @@
 // 入金消込のロジック
+// 請求ごとに「残高」を持ち、入金を残高に当てていく（一部入金・分割入金・過入金に対応する）。
 import type { Payment, Receivable } from './data';
 import { namesMatch } from './normalize';
 
-export type MatchKind = 'exact' | 'combined' | 'fee' | 'amountOnly';
-export type Match = { kind: MatchKind; payment: Payment; receivables: Receivable[]; diff: number };
+export type MatchKind = 'exact' | 'installment' | 'combined' | 'fee' | 'partial' | 'overpaid' | 'amountOnly';
+/** 1件の入金を、どの請求にいくら当てたか。 */
+export type Allocation = { receivable: Receivable; applied: number; remaining: number };
+export type Match = {
+  kind: MatchKind;
+  payment: Payment;
+  allocations: Allocation[];
+  /** 差額。fee：振込手数料（請求側が多い）／partial：消し込んだ後の残高／overpaid：多く入金された額 */
+  diff: number;
+};
+export type OpenReceivable = { receivable: Receivable; balance: number };
 export type MatchResult = {
   matches: Match[];
-  unmatchedReceivables: Receivable[];
-  unmatchedPayments: { payment: Payment; candidates: Receivable[] }[];
+  /** 残高が残っている請求（一部入金のものを含む） */
+  unmatchedReceivables: OpenReceivable[];
+  unmatchedPayments: { payment: Payment; candidates: OpenReceivable[] }[];
 };
 
 export const KIND_LABEL: Record<MatchKind, string> = {
   exact: '消込済（名義・金額一致）',
+  installment: '消込済（分割入金で完済）',
   combined: '消込済（複数の請求をまとめて入金）',
   fee: '消込済（振込手数料の差引）',
+  partial: '一部入金（残高あり）',
+  overpaid: '過入金（多く入金）',
   amountOnly: '要確認（金額のみ一致）',
 };
+
+/** 担当者が確認したほうがよい結果（画面で色を付ける）。 */
+export const NEEDS_ATTENTION: ReadonlySet<MatchKind> = new Set(['partial', 'overpaid', 'amountOnly']);
+
+/** 差額の欄に出す文字。 */
+export function diffLabel(m: Match): string {
+  const yen = (n: number) => `${n.toLocaleString('ja-JP')}円`;
+  if (m.kind === 'fee') return `手数料 ${yen(m.diff)}`;
+  if (m.kind === 'partial') return `残高 ${yen(m.diff)}`;
+  if (m.kind === 'overpaid') return `過入金 ${yen(m.diff)}`;
+  return '';
+}
 
 const MAX_COMBINE = 6; // まとめ入金として組み合わせる請求の最大件数
 const MAX_CANDIDATES = 16; // 組み合わせを探す請求の最大件数（時間がかかりすぎないように）
 
-/** candidates の中から、合計が target - tol 〜 target となる組み合わせを探す（件数の少ない順・期日の早い順）。 */
-function findSubset(candidates: Receivable[], minTotal: number, maxTotal: number): Receivable[] | null {
+type Open = { receivable: Receivable; balance: number; paidBefore: boolean };
+
+/** candidates の中から、残高の合計が minTotal 〜 maxTotal となる組み合わせを探す（件数の少ない順・期日の早い順）。 */
+function findSubset(candidates: Open[], minTotal: number, maxTotal: number): Open[] | null {
   const list = candidates.slice(0, MAX_CANDIDATES);
   for (let size = 2; size <= Math.min(MAX_COMBINE, list.length); size++) {
-    const pick: Receivable[] = [];
-    const walk = (start: number, sum: number): Receivable[] | null => {
+    const pick: Open[] = [];
+    const walk = (start: number, sum: number): Open[] | null => {
       if (pick.length === size) return sum >= minTotal && sum <= maxTotal ? [...pick] : null;
       for (let i = start; i < list.length; i++) {
-        if (sum + list[i].amount > maxTotal && list[i].amount > 0) continue;
+        if (sum + list[i].balance > maxTotal && list[i].balance > 0) continue;
         pick.push(list[i]);
-        const found = walk(i + 1, sum + list[i].amount);
+        const found = walk(i + 1, sum + list[i].balance);
         pick.pop();
         if (found) return found;
       }
@@ -42,87 +70,143 @@ function findSubset(candidates: Receivable[], minTotal: number, maxTotal: number
   return null;
 }
 
-const byDue = (a: Receivable, b: Receivable) => (a.due ?? '').localeCompare(b.due ?? '');
+const byDue = (a: Open, b: Open) => (a.receivable.due ?? '').localeCompare(b.receivable.due ?? '');
 
 /**
- * 入金を債権に消し込む。
- * 1. 名義が一致する債権のうち、金額が一致する1件
- * 2. 名義が一致する債権の組み合わせで、合計が一致するもの（まとめ入金）
+ * 入金を債権に消し込む（入金日の早い順に処理する）。
+ * 1. 名義が一致する請求のうち、残高と金額が一致する1件（前に一部入金があれば「分割入金で完済」）
+ * 2. 名義が一致する請求の組み合わせで、残高の合計が一致するもの（まとめ入金）
  * 3. 名義が一致し、差額が振込手数料の範囲内（1件 → 組み合わせの順）
- * 4. 名義は一致しないが、金額が一致する債権・入金がそれぞれ1件だけ（要確認）
+ * 4. 名義が一致し、入金が残高の合計より少ない → 期日の早い請求から当てる（一部入金。残りは残高として残す）
+ * 5. 名義が一致し、入金が残高の合計より多い → すべて消し込み、超えた分を過入金とする
+ * 6. 名義は一致しないが、金額が一致する請求・入金がそれぞれ1件だけ（要確認）
  */
 export function reconcile(receivables: Receivable[], payments: Payment[], feeTolerance = 880): MatchResult {
-  const open = new Set(receivables);
+  const opens: Open[] = receivables.map((r) => ({ receivable: r, balance: r.amount, paidBefore: false }));
+  const isOpen = (o: Open) => o.balance > 0;
   const matches: Match[] = [];
   const left: Payment[] = [];
   const tol = Math.max(0, feeTolerance);
   const sortedPayments = [...payments].sort((a, b) => a.date.localeCompare(b.date));
 
   for (const p of sortedPayments) {
-    const same = [...open].filter((r) => namesMatch(p.payer, r.customer, r.kana)).sort(byDue);
-    const take = (kind: MatchKind, rs: Receivable[]) => {
-      rs.forEach((r) => open.delete(r));
-      matches.push({ kind, payment: p, receivables: rs, diff: rs.reduce((s, r) => s + r.amount, 0) - p.amount });
+    const same = opens.filter((o) => isOpen(o) && namesMatch(p.payer, o.receivable.customer, o.receivable.kana)).sort(byDue);
+    /** 指定した額を請求に当てる。 */
+    const apply = (kind: MatchKind, parts: [Open, number][], diff: number) => {
+      const allocations = parts.map(([o, amount]) => {
+        o.balance -= amount;
+        o.paidBefore = true;
+        return { receivable: o.receivable, applied: amount, remaining: o.balance };
+      });
+      matches.push({ kind, payment: p, allocations, diff });
     };
-    const exact = same.find((r) => r.amount === p.amount);
+    /** 請求の残高をすべて消す。 */
+    const clear = (kind: MatchKind, os: Open[]) => {
+      const total = os.reduce((s, o) => s + o.balance, 0);
+      apply(kind, os.map((o) => [o, o.balance]), total - p.amount);
+    };
+
+    const exact = same.find((o) => o.balance === p.amount);
     if (exact) {
-      take('exact', [exact]);
+      clear(exact.paidBefore ? 'installment' : 'exact', [exact]);
       continue;
     }
     const combo = findSubset(same, p.amount, p.amount);
     if (combo) {
-      take('combined', combo);
+      clear('combined', combo);
       continue;
     }
     if (tol > 0) {
-      const fee = same.find((r) => r.amount > p.amount && r.amount - p.amount <= tol);
+      const fee = same.find((o) => o.balance > p.amount && o.balance - p.amount <= tol);
       if (fee) {
-        take('fee', [fee]);
+        clear('fee', [fee]);
         continue;
       }
       const feeCombo = findSubset(same, p.amount + 1, p.amount + tol);
       if (feeCombo) {
-        take('fee', feeCombo);
+        clear('fee', feeCombo);
         continue;
       }
+    }
+    const total = same.reduce((s, o) => s + o.balance, 0);
+    if (same.length && p.amount < total) {
+      // 一部入金：期日の早い請求から順に当てる
+      let rest = p.amount;
+      const parts: [Open, number][] = [];
+      for (const o of same) {
+        if (rest <= 0) break;
+        const amount = Math.min(rest, o.balance);
+        parts.push([o, amount]);
+        rest -= amount;
+      }
+      const [lastOpen, lastAmount] = parts[parts.length - 1];
+      apply('partial', parts, lastOpen.balance - lastAmount);
+      continue;
+    }
+    if (same.length && p.amount > total) {
+      // 過入金：残高をすべて消し込み、超えた分は仮受金などで処理してもらう
+      apply('overpaid', same.map((o) => [o, o.balance]), p.amount - total);
+      continue;
     }
     left.push(p);
   }
 
-  // 金額だけで一致：その金額の未消込の債権と入金が、それぞれ1件だけのとき
-  const unmatchedPayments: MatchResult['unmatchedPayments'] = [];
+  // 金額だけで一致：その金額の未消込の請求と入金が、それぞれ1件だけのとき
+  const unmatched: Payment[] = [];
   for (const p of left) {
     const sameAmountPayments = left.filter((q) => q.amount === p.amount);
-    const sameAmountReceivables = [...open].filter((r) => r.amount === p.amount);
-    if (sameAmountPayments.length === 1 && sameAmountReceivables.length === 1) {
-      open.delete(sameAmountReceivables[0]);
-      matches.push({ kind: 'amountOnly', payment: p, receivables: sameAmountReceivables, diff: 0 });
+    const sameAmountOpens = opens.filter((o) => isOpen(o) && o.balance === p.amount);
+    if (sameAmountPayments.length === 1 && sameAmountOpens.length === 1) {
+      const o = sameAmountOpens[0];
+      o.balance = 0;
+      matches.push({ kind: 'amountOnly', payment: p, allocations: [{ receivable: o.receivable, applied: p.amount, remaining: 0 }], diff: 0 });
     } else {
-      unmatchedPayments.push({ payment: p, candidates: [] });
+      unmatched.push(p);
     }
   }
-  for (const u of unmatchedPayments) {
-    u.candidates = [...open].filter((r) => namesMatch(u.payment.payer, r.customer, r.kana)).sort(byDue);
-  }
 
+  const toOpen = (o: Open): OpenReceivable => ({ receivable: o.receivable, balance: o.balance });
   return {
     matches,
-    unmatchedReceivables: receivables.filter((r) => open.has(r)),
-    unmatchedPayments,
+    unmatchedReceivables: opens.filter(isOpen).map(toOpen),
+    unmatchedPayments: unmatched.map((p) => ({
+      payment: p,
+      candidates: opens
+        .filter((o) => isOpen(o) && namesMatch(p.payer, o.receivable.customer, o.receivable.kana))
+        .sort(byDue)
+        .map(toOpen),
+    })),
   };
 }
 
-/** 結果を CSV 用の行にする（債権1件につき1行）。 */
+/** 結果を CSV 用の行にする（入金と請求の組み合わせごとに1行）。 */
 export function resultRows(result: MatchResult): (string | number)[][] {
   const rows: (string | number)[][] = [
-    ['状態', '請求番号', '取引先名', '請求金額', '入金日', '振込依頼人名', '入金額', '差額（請求−入金）'],
+    ['状態', '請求番号', '取引先名', '請求金額', '入金日', '振込依頼人名', '入金額', '消込額', '消込後の残高', '差額の内容', '差額'],
   ];
   for (const m of result.matches) {
-    m.receivables.forEach((r, i) =>
-      rows.push([KIND_LABEL[m.kind], r.id, r.customer, r.amount, m.payment.date, m.payment.payer, i === 0 ? m.payment.amount : '', i === 0 ? m.diff : '']),
+    const kindOfDiff = m.kind === 'fee' ? '振込手数料' : m.kind === 'overpaid' ? '過入金' : '';
+    m.allocations.forEach((a, i) =>
+      rows.push([
+        KIND_LABEL[m.kind],
+        a.receivable.id,
+        a.receivable.customer,
+        a.receivable.amount,
+        m.payment.date,
+        m.payment.payer,
+        i === 0 ? m.payment.amount : '',
+        a.applied,
+        a.remaining,
+        i === 0 ? kindOfDiff : '',
+        i === 0 && kindOfDiff ? m.diff : '',
+      ]),
     );
   }
-  for (const r of result.unmatchedReceivables) rows.push(['未消込の債権', r.id, r.customer, r.amount, '', '', '', '']);
-  for (const { payment: p } of result.unmatchedPayments) rows.push(['未消込の入金', '', '', '', p.date, p.payer, p.amount, '']);
+  for (const { receivable: r, balance } of result.unmatchedReceivables) {
+    rows.push(['残高のある債権', r.id, r.customer, r.amount, '', '', '', '', balance, '', '']);
+  }
+  for (const { payment: p } of result.unmatchedPayments) {
+    rows.push(['未消込の入金', '', '', '', p.date, p.payer, p.amount, '', '', '', '']);
+  }
   return rows;
 }

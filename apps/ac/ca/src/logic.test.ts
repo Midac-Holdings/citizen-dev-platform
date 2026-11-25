@@ -60,21 +60,21 @@ describe('消込', () => {
     const rs = [r('2', 'さくら商事', 1000, 'サクラショウジ', '2026/12/31'), r('1', 'さくら商事', 1000, 'サクラショウジ', '2026/11/30')];
     const res = reconcile(rs, [p('a', 'ｻｸﾗｼﾖｳｼﾞ', 1000)]);
     expect(res.matches[0]).toMatchObject({ kind: 'exact', diff: 0 });
-    expect(res.matches[0].receivables[0].id).toBe('1');
-    expect(res.unmatchedReceivables.map((x) => x.id)).toEqual(['2']);
+    expect(res.matches[0].allocations[0].receivable.id).toBe('1');
+    expect(res.unmatchedReceivables.map((x) => x.receivable.id)).toEqual(['2']);
   });
   it('複数の請求のまとめ入金を消し込む', () => {
     const rs = [r('1', 'さくら商事', 300), r('2', 'さくら商事', 500), r('3', 'さくら商事', 700)];
     const res = reconcile(rs, [p('a', 'さくら商事', 1200)]);
     expect(res.matches[0].kind).toBe('combined');
-    expect(res.matches[0].receivables.map((x) => x.id).sort()).toEqual(['2', '3']);
+    expect(res.matches[0].allocations.map((x) => x.receivable.id).sort()).toEqual(['2', '3']);
   });
   it('振込手数料の差引を認める（上限を超えたら認めない）', () => {
     expect(reconcile([r('1', 'みどり運輸', 33000, 'ミドリウンユ')], [p('a', 'ﾐﾄﾞﾘｳﾝﾕ', 32560)]).matches[0]).toMatchObject({ kind: 'fee', diff: 440 });
+    // 上限を超えた差額は手数料とせず、一部入金として残高を残す
     const over = reconcile([r('1', 'みどり運輸', 33000, 'ミドリウンユ')], [p('a', 'ﾐﾄﾞﾘｳﾝﾕ', 32000)]);
-    expect(over.matches).toHaveLength(0);
-    expect(over.unmatchedPayments[0].candidates.map((x) => x.id)).toEqual(['1']);
-    expect(reconcile([r('1', 'みどり運輸', 33000, 'ミドリウンユ')], [p('a', 'ﾐﾄﾞﾘｳﾝﾕ', 32560)], 0).matches).toHaveLength(0);
+    expect(over.matches[0]).toMatchObject({ kind: 'partial', diff: 1000 });
+    expect(reconcile([r('1', 'みどり運輸', 33000, 'ミドリウンユ')], [p('a', 'ﾐﾄﾞﾘｳﾝﾕ', 32560)], 0).matches[0].kind).toBe('partial');
   });
   it('名義が違っても金額が1対1で一致すれば「要確認」にする', () => {
     const res = reconcile([r('1', '東西サービス', 44000)], [p('a', 'ﾄｳｻﾞｲ ﾎﾝﾃﾝ', 44000)]);
@@ -84,6 +84,28 @@ describe('消込', () => {
     const res = reconcile([r('1', 'A社', 500), r('2', 'B社', 500)], [p('a', 'ｼｰｼﾔ', 500)]);
     expect(res.matches).toHaveLength(0);
     expect(res.unmatchedReceivables).toHaveLength(2);
+    expect(res.unmatchedPayments).toHaveLength(1);
+  });
+  it('一部入金：期日の早い請求から当て、残高を残す', () => {
+    const rs = [r('2', 'さくら商事', 50000, undefined, '2026/12/31'), r('1', 'さくら商事', 100000, undefined, '2026/11/30')];
+    const res = reconcile(rs, [p('a', 'さくら商事', 120000)]);
+    expect(res.matches[0]).toMatchObject({ kind: 'partial', diff: 30000 });
+    expect(res.matches[0].allocations.map((a) => [a.receivable.id, a.applied, a.remaining])).toEqual([['1', 100000, 0], ['2', 20000, 30000]]);
+    expect(res.unmatchedReceivables.map((u) => [u.receivable.id, u.balance])).toEqual([['2', 30000]]);
+  });
+  it('分割入金：2回目の入金で残高と一致すれば「分割入金で完済」', () => {
+    const res = reconcile([r('1', 'さくら商事', 880000)], [p('b', 'さくら商事', 440000, '2026/11/28'), p('a', 'さくら商事', 440000, '2026/11/20')]);
+    expect(res.matches.map((m) => [m.payment.id, m.kind, m.diff])).toEqual([['a', 'partial', 440000], ['b', 'installment', 0]]);
+    expect(res.unmatchedReceivables).toHaveLength(0);
+  });
+  it('過入金：残高をすべて消し込み、多い分を差額にする', () => {
+    const res = reconcile([r('1', '伊藤デザイン', 77000, 'イトウデザイン')], [p('a', 'ﾄﾞｳ)ｲﾄｳﾃﾞｻﾞｲﾝ', 80000)]);
+    expect(res.matches[0]).toMatchObject({ kind: 'overpaid', diff: 3000 });
+    expect(res.unmatchedReceivables).toHaveLength(0);
+  });
+  it('名義が一致する請求がなければ、一部入金・過入金にはしない', () => {
+    const res = reconcile([r('1', 'さくら商事', 1000)], [p('a', 'ﾖｼﾀﾞ ﾀﾛｳ', 500)]);
+    expect(res.matches).toHaveLength(0);
     expect(res.unmatchedPayments).toHaveLength(1);
   });
   it('サンプルデータの結果', () => {
