@@ -3,7 +3,7 @@
   "description": "債権（請求）と入金の CSV をアップすると、名義と金額で自動的に消し込み、結果と未消込の一覧を表示します。",
   "category": "管理",
   "icon": "💴",
-  "color": "#1f8a4c",
+  "color": "#1d5fc4",
   "owner": "AC",
   "status": "available",
   "access": [
