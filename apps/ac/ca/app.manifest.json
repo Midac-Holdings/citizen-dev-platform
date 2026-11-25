@@ -1,0 +1,18 @@
+{
+  "name": "入金消込アプリ",
+  "description": "債権（請求）と入金の CSV をアップすると、名義と金額で自動的に消し込み、結果と未消込の一覧を表示します。",
+  "category": "管理",
+  "icon": "💴",
+  "color": "#1f8a4c",
+  "owner": "AC",
+  "status": "available",
+  "access": [
+    "authenticated"
+  ],
+  "request": {
+    "summary": "債権と入金のデータをアップして、消込した結果を見ることができるアプリ",
+    "access": "全社員",
+    "currentWork": "入金消込業務",
+    "hoursPerMonth": 10
+  }
+}

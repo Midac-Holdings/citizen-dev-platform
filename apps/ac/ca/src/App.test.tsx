@@ -1,0 +1,43 @@
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { describe, expect, it } from 'vitest';
+import App from './App';
+import { toCsv } from './csv';
+import { SAMPLE_PAYMENTS, SAMPLE_RECEIVABLES } from './data';
+
+const csvFile = (name: string, rows: string[][]) => new File([toCsv(rows)], name, { type: 'text/csv' });
+
+describe('App', () => {
+  it('ポータルに戻るリンクと保存先の表示がある', () => {
+    render(<App />);
+    expect(screen.getByRole('link', { name: /ポータルに戻る/ })).toHaveAttribute('href', '/');
+    expect(screen.getByText(/このブラウザ内（localStorage）/)).toBeInTheDocument();
+  });
+
+  it('債権と入金の CSV をアップすると消込結果が表示され、保存される', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<App />);
+    expect(screen.getByText(/両方アップすると/)).toBeInTheDocument();
+    await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
+    await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
+
+    expect(await screen.findByText('債権.csv：5件')).toBeInTheDocument();
+    expect(screen.getByText('5 / 5件')).toBeInTheDocument();
+    expect(screen.getByText('消込済（複数の請求をまとめて入金）')).toBeInTheDocument();
+    expect(screen.getByText('要確認（金額のみ一致）')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: /未消込の入金/ }));
+    expect(within(screen.getByRole('table')).getByText('ﾐﾅﾐﾔﾏ(ｶ')).toBeInTheDocument();
+
+    unmount();
+    render(<App />);
+    expect(screen.getByText('5 / 5件')).toBeInTheDocument();
+  });
+
+  it('必要な列がない CSV はエラーを表示する', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('x.csv', [['日付', 'メモ'], ['1', '2']]));
+    expect(await screen.findByText(/列が見つかりません/)).toBeInTheDocument();
+  });
+});
