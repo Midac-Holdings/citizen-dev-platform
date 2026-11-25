@@ -22,6 +22,8 @@ describe('App', () => {
     await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
 
     expect(await screen.findByText('債権.csv：5件')).toBeInTheDocument();
+    expect(screen.queryByText('5 / 5件')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '消込開始' }));
     expect(screen.getByText('5 / 5件')).toBeInTheDocument();
     expect(screen.getByText('消込済（複数の請求をまとめて入金）')).toBeInTheDocument();
     expect(screen.getByText('要確認（金額のみ一致）')).toBeInTheDocument();
@@ -47,6 +49,7 @@ describe('App', () => {
     render(<App />);
     await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
     await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
+    await user.click(screen.getByRole('button', { name: '消込開始' }));
     expect(await screen.findByText('5 / 5件')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: '全データ削除' }));
@@ -57,5 +60,24 @@ describe('App', () => {
     await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
     expect(await screen.findByText('債権.csv：5件')).toBeInTheDocument();
     vi.restoreAllMocks();
+  });
+
+  it('両方そろうまで消込開始は押せず、データや設定を変えると押し直しになる', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    const start = screen.getByRole('button', { name: '消込開始' });
+    expect(start).toBeDisabled();
+    await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
+    await screen.findByText('債権.csv：5件');
+    expect(start).toBeDisabled();
+    await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
+    await screen.findByText('入金.csv：5件');
+    expect(start).toBeEnabled();
+
+    await user.click(start);
+    expect(screen.getByText('5 / 5件')).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/振込手数料として認める差額/), '0');
+    expect(screen.queryByText('5 / 5件')).not.toBeInTheDocument();
+    expect(screen.getByText(/「消込開始」を押すと/)).toBeInTheDocument();
   });
 });

@@ -5,8 +5,8 @@ import type { Payment, Receivable } from './data';
 import { KIND_LABEL, reconcile, resultRows } from './match';
 
 const STORAGE_KEY = 'ac-ca:v1';
-type Saved = { receivables: Receivable[]; payments: Payment[]; receivableFile: string; paymentFile: string; fee: number };
-const EMPTY: Saved = { receivables: [], payments: [], receivableFile: '', paymentFile: '', fee: 880 };
+type Saved = { receivables: Receivable[]; payments: Payment[]; receivableFile: string; paymentFile: string; fee: number; started: boolean };
+const EMPTY: Saved = { receivables: [], payments: [], receivableFile: '', paymentFile: '', fee: 880, started: false };
 
 function loadSaved(): Saved {
   try {
@@ -69,20 +69,24 @@ export default function App() {
     if (!file) return;
     const { items, errors } = loadReceivables(await readFile(file));
     setMessages((m) => ({ ...m, receivables: errors }));
-    if (items.length) update({ receivables: items, receivableFile: file.name });
+    if (items.length) update({ receivables: items, receivableFile: file.name, started: false });
   };
   const onPayments = async (file: File | undefined) => {
     if (!file) return;
     const { items, errors } = loadPayments(await readFile(file));
     setMessages((m) => ({ ...m, payments: errors }));
-    if (items.length) update({ payments: items, paymentFile: file.name });
+    if (items.length) update({ payments: items, paymentFile: file.name, started: false });
   };
 
   const ready = saved.receivables.length > 0 && saved.payments.length > 0;
   const result = useMemo(
-    () => (ready ? reconcile(saved.receivables, saved.payments, saved.fee) : null),
-    [ready, saved.receivables, saved.payments, saved.fee],
+    () => (ready && saved.started ? reconcile(saved.receivables, saved.payments, saved.fee) : null),
+    [ready, saved.started, saved.receivables, saved.payments, saved.fee],
   );
+  const start = () => {
+    update({ started: true });
+    setTab('matched');
+  };
   const matchedReceivables = result ? result.matches.reduce((s, m) => s + m.receivables.length, 0) : 0;
   const needCheck = result ? result.matches.filter((m) => m.kind === 'amountOnly').length : 0;
 
@@ -127,7 +131,7 @@ export default function App() {
               min={0}
               inputMode="numeric"
               value={saved.fee}
-              onChange={(e) => update({ fee: Math.max(0, Number(e.target.value) || 0) })}
+              onChange={(e) => update({ fee: Math.max(0, Number(e.target.value) || 0), started: false })}
             />
           </label>
           <p className="muted">入金額が請求金額よりこの金額以内で少ない場合、振込手数料の差引として消し込みます。0 にすると差額を認めません。</p>
@@ -137,9 +141,16 @@ export default function App() {
         </section>
 
         <section className="card wide">
-          <h2>④ 消込結果</h2>
+          <h2>④ 消込</h2>
+          <button type="button" className="start" onClick={start} disabled={!ready}>
+            消込開始
+          </button>
           {!result ? (
-            <p className="muted">債権と入金の CSV を両方アップすると、自動で消込結果が表示されます。</p>
+            <p className="muted">
+              {ready
+                ? '「消込開始」を押すと、債権と入金を突き合わせて結果を表示します。'
+                : '①債権と②入金の CSV を両方アップすると、「消込開始」を押せるようになります。'}
+            </p>
           ) : (
             <>
               <div className="stats">

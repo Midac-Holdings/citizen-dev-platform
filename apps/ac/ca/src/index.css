@@ -41,3 +41,5 @@ button.sub { background: #e7effb; color: var(--blue); }
 td.num { text-align: right; white-space: nowrap; }
 tr.warn td { background: #fff4d6; }
 button.danger { background: #fdecea; color: #c0392b; }
+button.start { font-size: 1.05rem; padding: 14px; }
+button:disabled { background: #c9d3e1; color: #fff; cursor: not-allowed; }
