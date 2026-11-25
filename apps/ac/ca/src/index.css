@@ -37,7 +37,7 @@ button.sub { background: #e7effb; color: var(--blue); }
 .tabs button { background: #e7effb; color: var(--blue); padding: 8px 12px; font-size: 0.9rem; }
 .tabs button[aria-selected='true'] { background: var(--blue); color: #fff; }
 .scroll { overflow-x: auto; }
-.scroll table { min-width: 560px; }
+.scroll table { min-width: 720px; }
 td.num { text-align: right; white-space: nowrap; }
 tr.warn td { background: #fff4d6; }
 button.danger { background: #fdecea; color: #c0392b; }

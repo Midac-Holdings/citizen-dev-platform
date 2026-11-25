@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { decodeBytes, parseCsv, toCsv } from './csv';
 import { loadPayments, loadReceivables } from './data';
 import type { Payment, Receivable } from './data';
-import { diffLabel, KIND_LABEL, NEEDS_ATTENTION, reconcile, resultRows } from './match';
+import { invoiceRows, reconcile, resultRows } from './match';
 
 const STORAGE_KEY = 'ac-ca:v1';
 type Saved = { receivables: Receivable[]; payments: Payment[]; receivableFile: string; paymentFile: string; fee: number; started: boolean };
@@ -87,8 +87,11 @@ export default function App() {
     update({ started: true });
     setTab('matched');
   };
-  const clearedReceivables = result ? saved.receivables.length - result.unmatchedReceivables.length : 0;
-  const needCheck = result ? result.matches.filter((m) => NEEDS_ATTENTION.has(m.kind)).length : 0;
+  const rows = useMemo(() => (result ? invoiceRows(result, saved.receivables) : []), [result, saved.receivables]);
+  const cleared = rows.filter((x) => x.remaining === 0);
+  const partial = rows.filter((x) => x.remaining > 0);
+  const unpaid = result ? result.unmatchedReceivables.filter((u) => u.balance === u.receivable.amount) : [];
+  const needCheck = rows.filter((x) => x.attention).length;
 
   return (
     <div className="page">
@@ -156,29 +159,30 @@ export default function App() {
             <h2>④ 消込結果</h2>
             <>
               <div className="stats">
-                <div><span>消込が完了した請求書</span><strong>{clearedReceivables} / {saved.receivables.length}件</strong><small>入金 {result.matches.length}件で消込</small></div>
-                <div><span>確認が必要な入金</span><strong>{needCheck}件</strong><small>表の黄色の行</small></div>
-                <div><span>残高のある請求書</span><strong>{result.unmatchedReceivables.length}件</strong><small>{yen(result.unmatchedReceivables.reduce((s, u) => s + u.balance, 0))}</small></div>
+                <div><span>消込完了の請求書</span><strong>{cleared.length}件</strong><small>{needCheck ? `うち確認が必要 ${cleared.filter((x) => x.attention).length}件` : `全${saved.receivables.length}件中`}</small></div>
+                <div><span>一部入金の請求書</span><strong>{partial.length}件</strong><small>残高 {yen(partial.reduce((s, x) => s + x.remaining, 0))}</small></div>
+                <div><span>未入金の請求書</span><strong>{unpaid.length}件</strong><small>{yen(unpaid.reduce((s, u) => s + u.balance, 0))}</small></div>
                 <div><span>未消込の入金</span><strong>{result.unmatchedPayments.length}件</strong><small>{yen(result.unmatchedPayments.reduce((s, u) => s + u.payment.amount, 0))}</small></div>
               </div>
               <div className="tabs" role="tablist">
-                <button type="button" role="tab" aria-selected={tab === 'matched'} onClick={() => setTab('matched')}>消込結果（入金 {result.matches.length}件）</button>
+                <button type="button" role="tab" aria-selected={tab === 'matched'} onClick={() => setTab('matched')}>消込結果（請求書 {rows.length}件）</button>
                 <button type="button" role="tab" aria-selected={tab === 'receivables'} onClick={() => setTab('receivables')}>残高のある請求書（{result.unmatchedReceivables.length}件）</button>
                 <button type="button" role="tab" aria-selected={tab === 'payments'} onClick={() => setTab('payments')}>未消込の入金（{result.unmatchedPayments.length}件）</button>
               </div>
               <div className="scroll">
                 {tab === 'matched' && (
                   <table>
-                    <thead><tr><th>状態</th><th>入金日</th><th>振込依頼人名</th><th>入金額</th><th>消し込んだ請求（消込額）</th><th>差額・残高</th></tr></thead>
+                    <thead><tr><th>状態</th><th>請求番号</th><th>取引先名</th><th>請求金額</th><th>入金（入金日・振込依頼人名・入金額）</th><th>消込額</th><th>差額・残高</th></tr></thead>
                     <tbody>
-                      {result.matches.map((m) => (
-                        <tr key={m.payment.id} className={NEEDS_ATTENTION.has(m.kind) ? 'warn' : ''}>
-                          <td>{KIND_LABEL[m.kind]}</td>
-                          <td>{m.payment.date}</td>
-                          <td>{m.payment.payer}</td>
-                          <td className="num">{yen(m.payment.amount)}</td>
-                          <td>{m.allocations.map((a) => <div key={a.receivable.id}>{a.receivable.id} {a.receivable.customer} {yen(a.applied)}</div>)}</td>
-                          <td className="num">{diffLabel(m) || '—'}</td>
+                      {rows.map((x) => (
+                        <tr key={x.receivable.id} className={x.attention ? 'warn' : ''}>
+                          <td>{x.label}</td>
+                          <td>{x.receivable.id}</td>
+                          <td>{x.receivable.customer}</td>
+                          <td className="num">{yen(x.receivable.amount)}</td>
+                          <td>{x.payments.map(({ payment: p }) => <div key={p.id}>{p.date} {p.payer} {yen(p.amount)}</div>)}</td>
+                          <td className="num">{yen(x.applied)}</td>
+                          <td className="num">{x.note || '—'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -210,9 +214,9 @@ export default function App() {
                   </table>
                 )}
               </div>
-              <p className="muted">表は入金1件につき1行です（まとめ入金は、1行に複数の請求書が入ります）。色の付いた行は確認が必要です。「一部入金」は残高を取引先に確認、「過入金」は多い分を仮受金にして返金か次回充当かを確認、「要確認」は名義が違い金額だけが一致したものです。内容を確認してから会計システムへ反映してください。</p>
+              <p className="muted">表は請求書1件につき1行です（分割入金は、1行に複数の入金が入ります）。色の付いた行は確認が必要です。「一部入金」は残高を取引先に確認、「過入金」は多い分を仮受金にして返金か次回充当かを確認、「要確認」は名義が違い金額だけが一致したものです。内容を確認してから会計システムへ反映してください。</p>
               <div className="center">
-                <button type="button" className="download" onClick={() => download('消込結果.csv', resultRows(result))}>
+                <button type="button" className="download" onClick={() => download('消込結果.csv', resultRows(result, saved.receivables))}>
                   ⬇ 消込結果を CSV でダウンロード
                 </button>
               </div>

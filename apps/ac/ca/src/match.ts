@@ -179,31 +179,107 @@ export function reconcile(receivables: Receivable[], payments: Payment[], feeTol
   };
 }
 
-/** 結果を CSV 用の行にする（入金と請求の組み合わせごとに1行）。 */
-export function resultRows(result: MatchResult): (string | number)[][] {
-  const rows: (string | number)[][] = [
-    ['状態', '請求番号', '取引先名', '請求金額', '入金日', '振込依頼人名', '入金額', '消込額', '消込後の残高', '差額の内容', '差額'],
-  ];
+/** 請求書1件ごとの消込結果（表と CSV に使う）。 */
+export type InvoiceRow = {
+  receivable: Receivable;
+  payments: { payment: Payment; applied: number }[];
+  applied: number;
+  remaining: number;
+  label: string;
+  attention: boolean;
+  /** 差額の欄に出す文字（手数料・過入金・残高） */
+  note: string;
+  diffKind: '' | '振込手数料' | '過入金' | '残高';
+  diff: number;
+};
+
+/** 消込結果を請求書ごとにまとめる（入金のあった請求書だけ。並びは債権 CSV の順）。 */
+export function invoiceRows(result: MatchResult, receivables: Receivable[]): InvoiceRow[] {
+  const yen = (n: number) => `${n.toLocaleString('ja-JP')}円`;
+  const byReceivable = new Map<Receivable, { match: Match; allocation: Allocation; index: number }[]>();
   for (const m of result.matches) {
-    const kindOfDiff = m.kind === 'fee' ? '振込手数料' : m.kind === 'overpaid' ? '過入金' : '';
-    m.allocations.forEach((a, i) =>
-      rows.push([
-        KIND_LABEL[m.kind],
-        a.receivable.id,
-        a.receivable.customer,
-        a.receivable.amount,
-        m.payment.date,
-        m.payment.payer,
-        i === 0 ? m.payment.amount : '',
-        a.applied,
-        a.remaining,
-        i === 0 ? kindOfDiff : '',
-        i === 0 && kindOfDiff ? m.diff : '',
-      ]),
-    );
+    m.allocations.forEach((a, index) => {
+      const list = byReceivable.get(a.receivable) ?? [];
+      list.push({ match: m, allocation: a, index });
+      byReceivable.set(a.receivable, list);
+    });
   }
-  for (const { receivable: r, balance } of result.unmatchedReceivables) {
-    rows.push(['残高のある債権', r.id, r.customer, r.amount, '', '', '', '', balance, '', '']);
+  const rows: InvoiceRow[] = [];
+  for (const r of receivables) {
+    const list = byReceivable.get(r);
+    if (!list) continue;
+    const last = list[list.length - 1];
+    const remaining = last.allocation.remaining;
+    const applied = list.reduce((s, x) => s + x.allocation.applied, 0);
+    const kind = last.match.kind;
+    let label: string;
+    let diffKind: InvoiceRow['diffKind'] = '';
+    let diff = 0;
+    if (remaining > 0) {
+      label = KIND_LABEL.partial;
+      diffKind = '残高';
+      diff = remaining;
+    } else if (list.length > 1) {
+      label = KIND_LABEL.installment;
+    } else if (kind === 'partial') {
+      // 一部入金の入金で、この請求書は残高まで消し込めた（期日の早い順に当てた）
+      label = '消込済（期日の早い順に充当）';
+    } else {
+      label = KIND_LABEL[kind];
+      const isFirst = last.index === 0;
+      const isLast = last.index === last.match.allocations.length - 1;
+      if (kind === 'fee' && isFirst) {
+        diffKind = '振込手数料';
+        diff = last.match.diff;
+      } else if (kind === 'overpaid' && isLast) {
+        diffKind = '過入金';
+        diff = last.match.diff;
+      }
+    }
+    const attention = remaining > 0 || list.some((x) => NEEDS_ATTENTION.has(x.match.kind) && x.match.kind !== 'partial');
+    const note = diffKind === '振込手数料' ? `手数料 ${yen(diff)}` : diffKind ? `${diffKind} ${yen(diff)}` : '';
+    rows.push({
+      receivable: r,
+      payments: list.map((x) => ({ payment: x.match.payment, applied: x.allocation.applied })),
+      applied,
+      remaining,
+      label,
+      attention,
+      note,
+      diffKind,
+      diff,
+    });
+  }
+  return rows;
+}
+
+/** 結果を CSV 用の行にする（請求書1件につき1行。複数の入金は「 / 」でつなぐ）。 */
+export function resultRows(result: MatchResult, receivables: Receivable[]): (string | number)[][] {
+  const rows: (string | number)[][] = [
+    ['状態', '請求番号', '取引先名', '請求金額', '入金日', '振込依頼人名', '入金額', '消込額', '残高', '差額の内容', '差額'],
+  ];
+  const balance = new Map(result.unmatchedReceivables.map((u) => [u.receivable, u.balance]));
+  const done = new Map(invoiceRows(result, receivables).map((row) => [row.receivable, row]));
+  for (const r of receivables) {
+    const row = done.get(r);
+    if (row) {
+      const join = (f: (x: InvoiceRow['payments'][number]) => string | number) => row.payments.map(f).join(' / ');
+      rows.push([
+        row.label,
+        r.id,
+        r.customer,
+        r.amount,
+        join((x) => x.payment.date),
+        join((x) => x.payment.payer),
+        join((x) => x.payment.amount),
+        row.applied,
+        row.remaining,
+        row.diffKind,
+        row.diffKind ? row.diff : '',
+      ]);
+    } else {
+      rows.push(['未入金', r.id, r.customer, r.amount, '', '', '', 0, balance.get(r) ?? r.amount, '', '']);
+    }
   }
   for (const { payment: p } of result.unmatchedPayments) {
     rows.push(['未消込の入金', '', '', '', p.date, p.payer, p.amount, '', '', '', '']);

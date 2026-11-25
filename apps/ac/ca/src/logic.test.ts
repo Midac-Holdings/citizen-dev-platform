@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeBytes, parseCsv, toCsv } from './csv';
 import { loadPayments, loadReceivables, SAMPLE_PAYMENTS, SAMPLE_RECEIVABLES } from './data';
 import type { Payment, Receivable } from './data';
-import { reconcile, resultRows } from './match';
+import { invoiceRows, reconcile, resultRows } from './match';
 import { nameKey, namesMatch, parseAmount } from './normalize';
 
 const r = (id: string, customer: string, amount: number, kana?: string, due?: string): Receivable => ({ id, customer, amount, kana, due });
@@ -109,12 +109,31 @@ describe('消込', () => {
     expect(res.unmatchedPayments).toHaveLength(1);
   });
   it('サンプルデータの結果', () => {
-    const res = reconcile(loadReceivables(SAMPLE_RECEIVABLES).items, loadPayments(SAMPLE_PAYMENTS).items);
+    const receivables = loadReceivables(SAMPLE_RECEIVABLES).items;
+    const res = reconcile(receivables, loadPayments(SAMPLE_PAYMENTS).items);
     expect(res.matches.map((m) => m.kind)).toEqual(['combined', 'fee', 'exact', 'amountOnly']);
     expect(res.unmatchedReceivables).toHaveLength(0);
     expect(res.unmatchedPayments.map((u) => u.payment.payer)).toEqual(['ﾐﾅﾐﾔﾏ(ｶ']);
-    const rows = resultRows(res);
+    const rows = resultRows(res, receivables);
     expect(rows[0][0]).toBe('状態');
     expect(rows).toHaveLength(1 + 5 + 1);
+  });
+  it('消込結果は請求書1件につき1行（まとめ入金は2行、分割入金は1行）', () => {
+    const rs = [r('1', 'さくら商事', 300000), r('2', 'さくら商事', 500000), r('3', 'みどり運輸', 880000), r('4', 'あおば', 10000)];
+    const ps = [p('a', 'さくら商事', 800000), p('b', 'みどり運輸', 440000, '2026/11/20'), p('c', 'みどり運輸', 440000, '2026/11/28')];
+    const res = reconcile(rs, ps);
+    const rows = invoiceRows(res, rs);
+    expect(rows.map((x) => [x.receivable.id, x.label, x.payments.length, x.remaining])).toEqual([
+      ['1', '消込済（複数の請求をまとめて入金）', 1, 0],
+      ['2', '消込済（複数の請求をまとめて入金）', 1, 0],
+      ['3', '消込済（分割入金で完済）', 2, 0],
+    ]);
+    // CSV：見出し＋消込3件＋未入金1件
+    expect(resultRows(res, rs).map((x) => x[0])).toEqual(['状態', ...rows.map((x) => x.label), '未入金']);
+  });
+  it('一部入金の請求書は残高を差額に出し、確認が必要にする', () => {
+    const rs = [r('1', 'さくら商事', 1100000)];
+    const [row] = invoiceRows(reconcile(rs, [p('a', 'さくら商事', 500000)]), rs);
+    expect(row).toMatchObject({ label: '一部入金（残高あり）', remaining: 600000, attention: true, note: '残高 600,000円' });
   });
 });
