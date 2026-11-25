@@ -12,7 +12,7 @@ F1 では、**ミダックのテナント限定ログイン**と **IP 制限**�
 
 ## 1. App Service を作る
 Azure Portal →「App Service」→「作成」→「Web アプリ」
-- 公開：コード／ランタイム スタック：**Node 22 LTS**／OS：**Linux**
+- 公開：コード／ランタイム スタック：**Node 26**／OS：**Linux**
 - 価格プラン：**Free F1**
 - 名前：例 `midac-citizen-f1`（URL は `https://<名前>.azurewebsites.net`）
 
@@ -78,7 +78,7 @@ PR ごとのプレビュー（静的 Web アプリ）は URL が PR ごとに変
 
 ## 1. App Service を作る
 Azure Portal →「App Service」→「作成」→「Web アプリ」
-- 名前：`midac-citizen-f1-stg`／公開：コード／ランタイム スタック：**Node 22 LTS**
+- 名前：`midac-citizen-f1-stg`／公開：コード／ランタイム スタック：**Node 26**
 - App Service プラン：**`gijiro-plan`**（OS・リージョンはプランに合わせて決まる。**Linux のプランであること**を確認する。
   Windows のプランだと `npm start` で起動しないため、この手順では動かない）
 
