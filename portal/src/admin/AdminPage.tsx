@@ -23,7 +23,7 @@ export default function AdminPage({ apps = allApps, onDownload = download }: { a
         <div className="hero__inner">
           <a className="hero__back" href="/">← アプリ一覧に戻る</a>
           <h1 className="hero__title">管理画面</h1>
-          <p className="hero__lead">公開されている市民アプリと、その申請内容（①〜⑤）の一覧です。</p>
+          <p className="hero__lead">市民アプリの管理台帳です。PR をマージすると、アプリと申請内容（①〜⑤）が自動で登録されます。</p>
         </div>
       </header>
 
