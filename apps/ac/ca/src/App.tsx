@@ -41,13 +41,9 @@ export default function App() {
   const [inputKey, setInputKey] = useState(0);
 
   const clearAll = () => {
-    if (!window.confirm('アップしたデータと設定をすべて削除します。よろしいですか？')) return;
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* 削除できなくても画面は初期状態に戻す */
-    }
-    setSaved(EMPTY);
+    if (!window.confirm('アップした債権・入金のデータと消込結果を削除します（設定は残ります）。よろしいですか？')) return;
+    // 設定（振込手数料の上限）は残し、データと結果だけを消す
+    update({ ...EMPTY, fee: saved.fee });
     setMessages({ receivables: [], payments: [] });
     setTab('matched');
     setInputKey((k) => k + 1);
@@ -79,6 +75,7 @@ export default function App() {
   };
 
   const ready = saved.receivables.length > 0 && saved.payments.length > 0;
+  const hasData = saved.receivables.length > 0 || saved.payments.length > 0;
   const result = useMemo(
     () => (ready && saved.started ? reconcile(saved.receivables, saved.payments, saved.fee) : null),
     [ready, saved.started, saved.receivables, saved.payments, saved.fee],
@@ -136,9 +133,6 @@ export default function App() {
             />
           </label>
           <p className="muted">入金額が請求金額よりこの金額以内で少ない場合、振込手数料の差引として消し込みます。0 にすると差額を認めません。</p>
-          <button type="button" className="danger" onClick={clearAll}>
-            全データ削除
-          </button>
         </section>
 
         <section className="startbar wide">
@@ -152,6 +146,10 @@ export default function App() {
                 : '①債権と②入金の CSV を両方アップすると、「消込開始」を押せるようになります。'}
             </p>
           )}
+          <button type="button" className="danger" onClick={clearAll} disabled={!hasData}>
+            全データ削除
+          </button>
+          <p className="muted small">アップしたデータと消込結果を消します。③の設定は残ります。</p>
         </section>
 
         {result && (

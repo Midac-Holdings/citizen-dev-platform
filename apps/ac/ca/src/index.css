@@ -40,7 +40,9 @@ button.sub { background: #e7effb; color: var(--blue); }
 .scroll table { min-width: 720px; }
 td.num { text-align: right; white-space: nowrap; }
 tr.warn td { background: #fff4d6; }
-button.danger { background: #fdecea; color: #c0392b; }
+button.danger { background: #fff; color: #c0392b; border: 2px solid #f3c4be; padding: 8px 20px; font-size: 0.9rem; margin-top: 8px; }
+button.danger:disabled { background: #fff; color: #c9d3e1; border-color: #e3e9f3; }
+.muted.small { font-size: 0.8rem; }
 
 button:disabled { background: #c9d3e1; color: #fff; cursor: not-allowed; }
 .startbar { display: grid; justify-items: center; gap: 8px; padding: 8px 0; text-align: center; }

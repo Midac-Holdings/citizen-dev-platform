@@ -43,10 +43,14 @@ describe('App', () => {
     expect(await screen.findByText(/列が見つかりません/)).toBeInTheDocument();
   });
 
-  it('全データ削除で初期状態に戻り、同じファイルを選び直せる', async () => {
+  it('全データ削除でデータと結果だけが消え、設定は残り、同じファイルを選び直せる', async () => {
     const user = userEvent.setup();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<App />);
+    expect(screen.getByRole('button', { name: '全データ削除' })).toBeDisabled();
+    const fee = screen.getByLabelText(/振込手数料として認める差額/);
+    await user.clear(fee);
+    await user.type(fee, '660');
     await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
     await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
     await user.click(screen.getByRole('button', { name: /消込開始/ }));
@@ -55,7 +59,9 @@ describe('App', () => {
     await user.click(screen.getByRole('button', { name: '全データ削除' }));
     expect(screen.getByText(/両方アップすると/)).toBeInTheDocument();
     expect(screen.queryByText('債権.csv：5件')).not.toBeInTheDocument();
-    expect(localStorage.getItem('ac-ca:v1')).toBeNull();
+    const stored = JSON.parse(localStorage.getItem('ac-ca:v1') ?? '{}');
+    expect(stored).toMatchObject({ receivables: [], payments: [], fee: 660, started: false });
+    expect(screen.getByLabelText(/振込手数料として認める差額/)).toHaveValue(660);
 
     await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
     expect(await screen.findByText('債権.csv：5件')).toBeInTheDocument();
