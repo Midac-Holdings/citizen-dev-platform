@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { toCsv } from './csv';
 import { SAMPLE_PAYMENTS, SAMPLE_RECEIVABLES } from './data';
@@ -39,5 +39,23 @@ describe('App', () => {
     render(<App />);
     await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('x.csv', [['日付', 'メモ'], ['1', '2']]));
     expect(await screen.findByText(/列が見つかりません/)).toBeInTheDocument();
+  });
+
+  it('全データ削除で初期状態に戻り、同じファイルを選び直せる', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<App />);
+    await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
+    await user.upload(screen.getByLabelText('入金の CSV ファイル'), csvFile('入金.csv', SAMPLE_PAYMENTS));
+    expect(await screen.findByText('5 / 5件')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '全データ削除' }));
+    expect(screen.getByText(/両方アップすると/)).toBeInTheDocument();
+    expect(screen.queryByText('債権.csv：5件')).not.toBeInTheDocument();
+    expect(localStorage.getItem('ac-ca:v1')).toBeNull();
+
+    await user.upload(screen.getByLabelText('債権の CSV ファイル'), csvFile('債権.csv', SAMPLE_RECEIVABLES));
+    expect(await screen.findByText('債権.csv：5件')).toBeInTheDocument();
+    vi.restoreAllMocks();
   });
 });

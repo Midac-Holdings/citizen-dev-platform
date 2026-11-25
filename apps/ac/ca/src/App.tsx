@@ -37,6 +37,21 @@ export default function App() {
   const [saved, setSaved] = useState<Saved>(loadSaved);
   const [messages, setMessages] = useState<{ receivables: string[]; payments: string[] }>({ receivables: [], payments: [] });
   const [tab, setTab] = useState<Tab>('matched');
+  // ファイル欄を作り直すための番号（全データ削除のあと、同じファイルを選び直しても読み込めるようにする）
+  const [inputKey, setInputKey] = useState(0);
+
+  const clearAll = () => {
+    if (!window.confirm('アップしたデータと設定をすべて削除します。よろしいですか？')) return;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* 削除できなくても画面は初期状態に戻す */
+    }
+    setSaved(EMPTY);
+    setMessages({ receivables: [], payments: [] });
+    setTab('matched');
+    setInputKey((k) => k + 1);
+  };
 
   const update = (next: Partial<Saved>) => {
     setSaved((prev) => {
@@ -84,7 +99,7 @@ export default function App() {
           <p className="muted">CSV（UTF-8 / Shift_JIS）。見出しに「取引先名」「請求金額」が必要です。銀行の名義はカナなので、取引先名が漢字の場合は「取引先カナ」の列を入れてください。「請求番号」「入金予定日」もあると便利です。</p>
           <label>
             債権の CSV ファイル
-            <input type="file" accept=".csv,text/csv" onChange={(e) => onReceivables(e.target.files?.[0])} />
+            <input key={`r${inputKey}`} type="file" accept=".csv,text/csv" onChange={(e) => onReceivables(e.target.files?.[0])} />
           </label>
           {saved.receivableFile && <p className="done">{saved.receivableFile}：{saved.receivables.length}件</p>}
           {messages.receivables.map((m) => <p className="error" key={m}>{m}</p>)}
@@ -96,7 +111,7 @@ export default function App() {
           <p className="muted">CSV（UTF-8 / Shift_JIS）。見出しに「振込依頼人名」「入金額」が必要です。「入金日」もあると便利です。</p>
           <label>
             入金の CSV ファイル
-            <input type="file" accept=".csv,text/csv" onChange={(e) => onPayments(e.target.files?.[0])} />
+            <input key={`p${inputKey}`} type="file" accept=".csv,text/csv" onChange={(e) => onPayments(e.target.files?.[0])} />
           </label>
           {saved.paymentFile && <p className="done">{saved.paymentFile}：{saved.payments.length}件</p>}
           {messages.payments.map((m) => <p className="error" key={m}>{m}</p>)}
@@ -116,8 +131,8 @@ export default function App() {
             />
           </label>
           <p className="muted">入金額が請求金額よりこの金額以内で少ない場合、振込手数料の差引として消し込みます。0 にすると差額を認めません。</p>
-          <button type="button" className="sub" onClick={() => { update(EMPTY); setMessages({ receivables: [], payments: [] }); }}>
-            データをすべて消す
+          <button type="button" className="danger" onClick={clearAll}>
+            全データ削除
           </button>
         </section>
 
