@@ -156,15 +156,15 @@ export default function App() {
             <h2>④ 消込結果</h2>
             <>
               <div className="stats">
-                <div><span>消込が完了した債権</span><strong>{clearedReceivables} / {saved.receivables.length}件</strong></div>
-                <div><span>要確認</span><strong>{needCheck}件</strong></div>
-                <div><span>残高のある債権</span><strong>{result.unmatchedReceivables.length}件</strong><small>{yen(result.unmatchedReceivables.reduce((s, u) => s + u.balance, 0))}</small></div>
+                <div><span>消込が完了した請求書</span><strong>{clearedReceivables} / {saved.receivables.length}件</strong><small>入金 {result.matches.length}件で消込</small></div>
+                <div><span>確認が必要な入金</span><strong>{needCheck}件</strong><small>表の黄色の行</small></div>
+                <div><span>残高のある請求書</span><strong>{result.unmatchedReceivables.length}件</strong><small>{yen(result.unmatchedReceivables.reduce((s, u) => s + u.balance, 0))}</small></div>
                 <div><span>未消込の入金</span><strong>{result.unmatchedPayments.length}件</strong><small>{yen(result.unmatchedPayments.reduce((s, u) => s + u.payment.amount, 0))}</small></div>
               </div>
               <div className="tabs" role="tablist">
-                <button type="button" role="tab" aria-selected={tab === 'matched'} onClick={() => setTab('matched')}>消込結果（{result.matches.length}）</button>
-                <button type="button" role="tab" aria-selected={tab === 'receivables'} onClick={() => setTab('receivables')}>残高のある債権（{result.unmatchedReceivables.length}）</button>
-                <button type="button" role="tab" aria-selected={tab === 'payments'} onClick={() => setTab('payments')}>未消込の入金（{result.unmatchedPayments.length}）</button>
+                <button type="button" role="tab" aria-selected={tab === 'matched'} onClick={() => setTab('matched')}>消込結果（入金 {result.matches.length}件）</button>
+                <button type="button" role="tab" aria-selected={tab === 'receivables'} onClick={() => setTab('receivables')}>残高のある請求書（{result.unmatchedReceivables.length}件）</button>
+                <button type="button" role="tab" aria-selected={tab === 'payments'} onClick={() => setTab('payments')}>未消込の入金（{result.unmatchedPayments.length}件）</button>
               </div>
               <div className="scroll">
                 {tab === 'matched' && (
@@ -210,7 +210,7 @@ export default function App() {
                   </table>
                 )}
               </div>
-              <p className="muted">色の付いた行は確認が必要です。「一部入金」は残高を取引先に確認、「過入金」は多い分を仮受金にして返金か次回充当かを確認、「要確認」は名義が違い金額だけが一致したものです。内容を確認してから会計システムへ反映してください。</p>
+              <p className="muted">表は入金1件につき1行です（まとめ入金は、1行に複数の請求書が入ります）。色の付いた行は確認が必要です。「一部入金」は残高を取引先に確認、「過入金」は多い分を仮受金にして返金か次回充当かを確認、「要確認」は名義が違い金額だけが一致したものです。内容を確認してから会計システムへ反映してください。</p>
               <div className="center">
                 <button type="button" className="download" onClick={() => download('消込結果.csv', resultRows(result))}>
                   ⬇ 消込結果を CSV でダウンロード
