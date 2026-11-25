@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { isEntraConfigured } from './config';
-import { extractFromMail, type Progress } from './extract';
-import { completeSignIn, isReturningFromSignIn } from './graph';
+import { extractFromMail, fetchOriginalMail, type Progress } from './extract';
+import { completeSignIn, isReturningFromSignIn, type OriginalMail } from './graph';
+import { sampleOriginalMail } from './sampleMails';
 import {
   VIEWS,
   clearMailExtraction,
@@ -11,6 +12,7 @@ import {
   filterTasks,
   isOverdue,
   loadSettings,
+  originalMailIdOf,
   loadTasks,
   saveSettings,
   saveStatus,
@@ -26,6 +28,8 @@ export interface MailDeps {
   returning: () => boolean;
   completeSignIn: () => Promise<boolean>;
   extract: typeof extractFromMail;
+  /** 元のメールを1通読む（サインインのため移動するときは null） */
+  original: (mailId: string) => Promise<OriginalMail | null>;
 }
 
 const defaultMailDeps: MailDeps = {
@@ -33,9 +37,26 @@ const defaultMailDeps: MailDeps = {
   returning: isReturningFromSignIn,
   completeSignIn,
   extract: extractFromMail,
+  original: fetchOriginalMail,
 };
 
 const PENDING_KEY = 'cp-tasukuri.pendingDays';
+/** 元のメールを見ようとしてサインインに移動したとき、どのタスクかを覚えておく */
+const PENDING_MAIL_KEY = 'cp-tasukuri.pendingMail';
+
+/** 元のメールの表示状態 */
+type Viewing =
+  | { task: Task; phase: 'loading' }
+  | { task: Task; phase: 'ok'; mail: OriginalMail; sample: boolean }
+  | { task: Task; phase: 'error'; message: string };
+
+const removePending = (key: string) => {
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    // 何もしない
+  }
+};
 const DAY_OPTIONS = [7, 14, 30] as const;
 
 interface Props {
@@ -51,10 +72,38 @@ export default function App({ today: todayProp, mail = defaultMailDeps }: Props)
   const [extraction, setExtraction] = useState(loadMailExtraction);
   const [progress, setProgress] = useState<Progress | null>(null);
   const [days, setDays] = useState<number>(30);
+  const [viewing, setViewing] = useState<Viewing | null>(null);
   const started = useRef(false);
+
+  async function openOriginal(task: Task) {
+    const sample = sampleOriginalMail(task);
+    const mailId = originalMailIdOf(task);
+    if (!mailId) {
+      setViewing(sample ? { task, phase: 'ok', mail: sample, sample: true } : { task, phase: 'error', message: '元のメールの情報がありません' });
+      return;
+    }
+    setViewing({ task, phase: 'loading' });
+    try {
+      removePending(PENDING_KEY);
+      sessionStorage.setItem(PENDING_MAIL_KEY, task.id);
+    } catch {
+      // 保存できなくても続ける
+    }
+    try {
+      const found = await mail.original(mailId);
+      if (!found) return; // サインインのため Microsoft の画面へ移動中
+      removePending(PENDING_MAIL_KEY);
+      setViewing((v) => (v?.task.id === task.id ? { task, phase: 'ok', mail: found, sample: false } : v));
+    } catch (e) {
+      removePending(PENDING_MAIL_KEY);
+      const message = e instanceof Error ? e.message : String(e);
+      setViewing((v) => (v?.task.id === task.id ? { task, phase: 'error', message } : v));
+    }
+  }
 
   async function runExtraction(d: number) {
     try {
+      removePending(PENDING_MAIL_KEY);
       sessionStorage.setItem(PENDING_KEY, String(d));
     } catch {
       // 保存できなくても続ける
@@ -78,6 +127,26 @@ export default function App({ today: todayProp, mail = defaultMailDeps }: Props)
   useEffect(() => {
     if (started.current || !mail.configured() || !mail.returning()) return;
     started.current = true;
+    // 元のメールを見ようとしてサインインした場合は、そのメールを開き直す
+    const pendingTask = sessionStorage.getItem(PENDING_MAIL_KEY);
+    const task = pendingTask ? loadTasks(today).find((t) => t.id === pendingTask) : undefined;
+    if (task) {
+      setViewing({ task, phase: 'loading' });
+      mail
+        .completeSignIn()
+        .then((ok) => {
+          window.history.replaceState(null, '', window.location.pathname);
+          if (ok) return openOriginal(task);
+          removePending(PENDING_MAIL_KEY);
+          setViewing({ task, phase: 'error', message: 'サインインできませんでした。もう一度お試しください' });
+        })
+        .catch((e: unknown) => {
+          removePending(PENDING_MAIL_KEY);
+          setViewing({ task, phase: 'error', message: e instanceof Error ? e.message : String(e) });
+        });
+      return;
+    }
+    removePending(PENDING_MAIL_KEY);
     const pending = Number(sessionStorage.getItem(PENDING_KEY) ?? '30') || 30;
     setDays(pending);
     setProgress({ phase: 'signing-in' });
@@ -160,17 +229,20 @@ export default function App({ today: todayProp, mail = defaultMailDeps }: Props)
               {view === '今日やる' ? '🎉 今日やるタスクはありません' : 'タスクはありません'}
             </p>
           ) : (
-            shown.map((t) => <TaskCard key={t.id} task={t} today={today} onStatus={setStatus} />)
+            shown.map((t) => <TaskCard key={t.id} task={t} today={today} onStatus={setStatus} onOpenMail={openOriginal} />)
           )}
         </section>
 
         <SettingsCard />
       </main>
+
+      {viewing && <MailViewer viewing={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
 
-function TaskCard({ task: t, today, onStatus }: { task: Task; today: Date; onStatus: (id: string, s: Status) => void }) {
+function TaskCard(props: { task: Task; today: Date; onStatus: (id: string, s: Status) => void; onOpenMail: (t: Task) => void }) {
+  const { task: t, today, onStatus, onOpenMail } = props;
   const overdue = isOverdue(t, today);
   const closed = t.status !== '未着手';
   return (
@@ -184,15 +256,10 @@ function TaskCard({ task: t, today, onStatus }: { task: Task; today: Date; onSta
       <h2 className="task-title">{t.title}</h2>
       <p className="detail">{t.detail}</p>
       <p className="mail">
-        ✉️ {t.mailFrom}「{t.mailSubject}」
-        {t.mailLink && (
-          <>
-            {' '}
-            <a href={t.mailLink} target="_blank" rel="noopener noreferrer">
-              Outlookで開く
-            </a>
-          </>
-        )}
+        ✉️ {t.mailFrom}「{t.mailSubject}」{' '}
+        <button type="button" className="link" onClick={() => onOpenMail(t)} aria-label={`元のメールを見る（${t.mailSubject}）`}>
+          元のメールを見る
+        </button>
       </p>
       <details className="why">
         <summary>
@@ -351,5 +418,98 @@ function SettingsCard() {
       {saved && <p className="done" role="status">保存しました（デモ：このブラウザ内のみ）</p>}
       <button type="submit">保存する</button>
     </form>
+  );
+}
+
+/** 元のメールを、タスクリの画面の中に表示する（文字だけ。保存しない） */
+function MailViewer({ viewing, onClose }: { viewing: Viewing; onClose: () => void }) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const [copied, setCopied] = useState<'' | 'ok' | 'ng'>('');
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const subject = viewing.phase === 'ok' ? viewing.mail.subject : viewing.task.mailSubject;
+
+  async function copySubject() {
+    try {
+      await navigator.clipboard.writeText(subject);
+      setCopied('ok');
+    } catch {
+      setCopied('ng');
+    }
+  }
+
+  return (
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <section className="viewer" role="dialog" aria-modal="true" aria-labelledby="viewer-title">
+        <div className="viewer-head">
+          <h2 id="viewer-title">✉️ 元のメール</h2>
+          <button ref={closeRef} type="button" className="secondary" onClick={onClose}>
+            閉じる
+          </button>
+        </div>
+
+        {viewing.phase === 'loading' && (
+          <p className="muted" role="status">
+            メールを読み込んでいます…
+          </p>
+        )}
+        {viewing.phase === 'error' && (
+          <p className="error" role="alert">
+            {viewing.message}
+          </p>
+        )}
+        {viewing.phase === 'ok' && (
+          <>
+            {viewing.sample && <p className="viewer-note">サンプルのメールです（架空の内容）</p>}
+            <h3 className="viewer-subject">{viewing.mail.subject}</h3>
+            <dl className="viewer-meta">
+              <dt>差出人</dt>
+              <dd>{viewing.mail.from || '（不明）'}</dd>
+              <dt>宛先</dt>
+              <dd>{viewing.mail.to.join('、') || '（なし）'}</dd>
+              {viewing.mail.cc.length > 0 && (
+                <>
+                  <dt>CC</dt>
+                  <dd>{viewing.mail.cc.join('、')}</dd>
+                </>
+              )}
+              <dt>受信日時</dt>
+              <dd>{new Date(viewing.mail.receivedAt).toLocaleString('ja-JP', { year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })}</dd>
+            </dl>
+            {viewing.mail.hasAttachments && (
+              <p className="viewer-attach">📎 添付ファイルがあります（添付は Outlook で件名を検索して開いてください）</p>
+            )}
+            <div className="viewer-body" aria-label="本文">
+              {viewing.mail.body || '（本文なし）'}
+            </div>
+          </>
+        )}
+
+        <div className="viewer-actions">
+          <button type="button" onClick={copySubject} disabled={viewing.phase === 'loading'}>
+            件名をコピー
+          </button>
+          {copied === 'ok' && (
+            <span className="done" role="status">
+              コピーしました。Outlook の検索欄に貼り付けると、このメールが見つかります
+            </span>
+          )}
+          {copied === 'ng' && (
+            <span className="error" role="status">
+              コピーできませんでした。件名を選択してコピーしてください
+            </span>
+          )}
+        </div>
+        <p className="muted small">メールはこの画面に表示するだけで、保存はしません。</p>
+      </section>
+    </div>
   );
 }

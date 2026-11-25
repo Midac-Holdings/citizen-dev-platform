@@ -65,3 +65,18 @@ button.secondary { background: #ececfb; color: #3a3aa0; }
 .mailcard .row label { flex: 0 0 auto; }
 .mail a { font-size: 0.85rem; }
 button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+button.link { background: none; color: var(--brand); padding: 0; border-radius: 0; font-size: 0.85rem; font-weight: 700; text-decoration: underline; }
+.overlay { position: fixed; inset: 0; background: rgba(20, 20, 50, 0.45); display: flex; align-items: flex-start; justify-content: center; padding: 24px 12px; overflow-y: auto; z-index: 10; }
+.viewer { background: #fff; border-radius: 16px; width: 100%; max-width: 720px; padding: 20px; display: grid; gap: 10px; box-shadow: 0 12px 40px rgba(20, 20, 60, 0.25); }
+.viewer-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.viewer-head h2 { margin: 0; font-size: 1.1rem; }
+.viewer-note { margin: 0; padding: 6px 10px; border-radius: 8px; background: #fff4d6; color: #7a4b00; font-weight: 700; font-size: 0.85rem; }
+.viewer-subject { margin: 0; font-size: 1.05rem; overflow-wrap: anywhere; }
+.viewer-meta { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 0.85rem; }
+.viewer-meta dt { color: var(--muted); font-weight: 700; }
+.viewer-meta dd { margin: 0; overflow-wrap: anywhere; }
+.viewer-attach { margin: 0; font-size: 0.85rem; color: var(--muted); }
+.viewer-body { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.9rem; background: #f8f8fc; border: 1px solid var(--line); border-radius: 10px; padding: 12px; max-height: 55vh; overflow-y: auto; }
+.viewer-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.small { font-size: 0.8rem; }
