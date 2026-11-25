@@ -1,5 +1,8 @@
 name: 検証用 App Service（stg）に公開
 
+# プレビュー2：市民の PR が提出（Ready for review）されたら、AI担当がここに公開して申請内容と相違ないかを確認する。
+# （プレビュー1は、PR ごとに自動で作られる静的 Web アプリのプレビュー。市民の開発中と部内テスト用）
+
 # マージ前の確認用：PR の内容を、検証用の App Service（本番と同じ仕組み：テナント限定ログイン・IP 制限）に公開する。
 # 使い方：Actions →「検証用 App Service（stg）に公開」→「Run workflow」→ PR の番号を入れる（空なら main）
 # 準備（appservice/README.md の「検証用（stg）」）：
@@ -90,6 +93,9 @@ jobs:
     runs-on: ubuntu-latest
     # 鍵は main からしか使えない環境に置く（環境の設定で、main 以外のブランチを拒否する）
     environment: staging
+    permissions:
+      contents: read
+      pull-requests: write # プレビュー2の URL を PR にコメントするため
     env:
       PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
       WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME_STG }}
@@ -107,6 +113,7 @@ jobs:
           path: deploy
 
       - name: 検証用 App Service に公開
+        id: deploy
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ vars.AZURE_WEBAPP_NAME_STG }}
@@ -117,10 +124,27 @@ jobs:
         env:
           PR: ${{ inputs.pr }}
           SHA: ${{ needs.build.outputs.sha }}
+          URL: ${{ steps.deploy.outputs.webapp-url }}
         run: |
           {
-            echo "### 検証用 App Service に公開しました"
+            echo "### プレビュー2（検証用 App Service）に公開しました"
             if [ -n "$PR" ]; then echo "- PR：#$PR"; else echo "- main"; fi
             echo "- コミット：\`$SHA\`"
-            echo "- 次に別の PR を公開すると上書きされます（検証用は1つだけ）"
+            echo "- URL：$URL"
+            echo "- 次に別の PR を公開すると上書きされます（プレビュー2は1つだけ）"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: PR にプレビュー2の URL をコメントする
+        if: inputs.pr != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ inputs.pr }}
+          SHA: ${{ needs.build.outputs.sha }}
+          URL: ${{ steps.deploy.outputs.webapp-url }}
+        run: |
+          body=$(printf '%s\n\n%s\n%s\n\n%s' \
+            "**プレビュー2（検証用）に公開しました**（AI担当の確認用）" \
+            "- URL：${URL%/}/" \
+            "- コミット：\`${SHA:0:7}\`" \
+            "別の PR をプレビュー2に公開すると上書きされます。このコメントの後に push した変更は入っていません。")
+          gh api "repos/${{ github.repository }}/issues/$PR/comments" -f body="$body" > /dev/null
